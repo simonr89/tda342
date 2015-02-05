@@ -47,9 +47,12 @@ ask question = Replay $ \t -> do
                    (val:ts) -> case val of
                                  Answer a -> return (Right a, addAnswer t a)
                                  Result str -> fail $ "ask" ++ str
-       
+
 emptyTrace :: Trace r
 emptyTrace = Trace [] []
+
+resetTrace :: Trace r -> Trace r
+resetTrace (Trace v t) = Trace [] (v ++ t)
 
 addResult       :: Trace r -> String -> Trace r
 addResult t str = Trace (visited t ++ [Result str]) (tailSafe $ todo t)

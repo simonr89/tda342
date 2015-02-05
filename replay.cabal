@@ -18,3 +18,9 @@ library
   exposed-modules:      Replay
   -- other-modules:       
   build-depends:       base >= 4 && <5, safe
+
+Test-Suite test-replay
+    type:            exitcode-stdio-1.0
+    hs-source-dirs:  test
+    main-is:         Test.hs
+    build-depends:   base, replay
