@@ -17,6 +17,7 @@ cabal-version:       >=1.8
 library
   exposed-modules:      Replay
   -- other-modules:       
+<<<<<<< HEAD
   build-depends:       base >= 4 && <5, safe
 
 Test-Suite test-replay
@@ -24,3 +25,6 @@ Test-Suite test-replay
     hs-source-dirs:  test
     main-is:         Test.hs
     build-depends:   base, replay
+=======
+  build-depends:       base >= 4 && <5, safe
+>>>>>>> 06ff20f4c2d79d96596990366e9a4169bce5ec62
