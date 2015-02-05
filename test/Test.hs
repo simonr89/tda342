@@ -73,6 +73,18 @@ testCases =
         c <- ask () -- should be 4
         return (a + b + c)
     }
+   , TestCase
+    { testName  = "test2"
+    , testInput   = [0,0]
+    , testResult  = (0, 2)
+    , testProgram = \tick -> do
+        io tick
+        a <- ask () -- should be 0
+        b <- io (return 0)
+        c <- ask () -- should be 0
+        io tick
+        return (a + b + c)
+    }
   ]
 
 -- | Running all the test cases.
