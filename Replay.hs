@@ -9,7 +9,8 @@ type Replay q r a = ReplayT IO q r a
 newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 
 liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
-liftR = undefined
+liftR m = ReplayT $ \t -> do a <- m
+                             return (Right a, t)
 
 instance (Monad m) => Monad (ReplayT m q r) where
     return x = ReplayT $ \t -> return (Right x, t)
