@@ -38,19 +38,7 @@ io input = Replay $ \t -> do
                (val:ts) -> case val of
                              Answer a -> fail "io"
                              Result str -> return (Right $ read str, addResult t str)
-               
-<<<<<<< HEAD
-=======
-       
-ask          :: q -> Replay q r r
-ask question = Replay $ \t -> do
-                 case todo t of
-                   [] -> return (Left question, t)
-                   (val:ts) -> case val of
-                                 Answer a -> return (Right a, addAnswer t a)
-                                 Result str -> fail $ "ask" ++ str
->>>>>>> 06ff20f4c2d79d96596990366e9a4169bce5ec62
-       
+                      
 ask          :: q -> Replay q r r
 ask question = Replay $ \t -> do
                  case todo t of
@@ -62,12 +50,9 @@ ask question = Replay $ \t -> do
 emptyTrace :: Trace r
 emptyTrace = Trace [] []
 
-<<<<<<< HEAD
 resetTrace :: Trace r -> Trace r
 resetTrace (Trace v t) = Trace [] (v ++ t)
 
-=======
->>>>>>> 06ff20f4c2d79d96596990366e9a4169bce5ec62
 addResult       :: Trace r -> String -> Trace r
 addResult t str = Trace (visited t ++ [Result str]) (tailSafe $ todo t)
              
