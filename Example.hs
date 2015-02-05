@@ -3,6 +3,10 @@ module Example where
 import Replay
 import Data.Time
 
+trace = Trace [] [Result "2015-02-05 15:05:08.780997 UTC",
+                  Result "()", Answer "27", Result "()", Answer "Simon", Result "()",
+                  Result "2015-02-05 15:05:08.780997 UTC"]
+
 example :: Replay String String Int
 example = do
   t0 <- io getCurrentTime
@@ -14,3 +18,15 @@ example = do
   t1 <- io getCurrentTime
   io (putStrLn ("Total time: " ++ show (diffUTCTime t1 t0)))
   return (read age)
+
+running :: Replay String String a -> IO a
+running prog = play emptyTrace
+ where
+  play t = do
+    r <- run prog t    -- this is the same prog every time!
+    case r of
+      Left (q, t') -> do
+        putStr ("Question: " ++ q ++ " ")
+        r <- getLine
+        play (addAnswer t' r)
+      Right x      -> return x
