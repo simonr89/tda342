@@ -15,7 +15,7 @@ instance Monad (Replay q r)
           (>>=) = bindReplay
 
 returnReplay :: a -> Replay q r a
-returnReplay = error "undefined"
+returnReplay x = Replay emptyTrace x
 
 bindReplay :: Replay q r a -> (a -> Replay q r b) -> Replay q r b
 bindReplay = error "undefined"
