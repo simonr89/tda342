@@ -4,7 +4,19 @@ import Safe
 
 -- Types
 -- 
-newtype Replay q r a = Replay { runReplay :: Trace r -> IO ((Either q a), Trace r) }
+type Replay q r a = ReplayT IO q r a 
+
+newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
+
+liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
+liftR = undefined
+
+instance (Monad m) => Monad (ReplayT m q r) where
+    return x = ReplayT $ \t -> return (Right x, t)
+    m >>=  k = ReplayT $ \t -> do (qora, t') <- runReplayT m t
+                                  case qora of
+                                     (Right a) -> runReplayT (k a) t'
+                                     (Left q) -> return (Left q, t')
 
 -- event up to now, events left to consume
 data Trace r = Trace { visited :: [Item r], todo :: [Item r] }
@@ -13,25 +25,9 @@ data Trace r = Trace { visited :: [Item r], todo :: [Item r] }
 data Item r = Answer r | Result String
               deriving (Show,Read)
 
--- Operations
-instance Monad (Replay q r)
-    where return = returnReplay
-          (>>=) = bindReplay
-
-returnReplay :: a -> Replay q r a
-returnReplay x = Replay $ \t -> return (Right x, t)
-
--- (Trace r -> IO ((Either q a), Trace r) ->
--- (a -> (Trace r -> IO ((Either q b), Trace r))) ->
--- (Trace r -> IO ((Either q b), Trace r)
-bindReplay     :: Replay q r a -> (a -> Replay q r b) -> Replay q r b
-bindReplay m k = Replay $ \t -> do (qora, t') <- runReplay m t
-                                   case qora of
-                                     (Right a) -> runReplay (k a) t'
-                                     (Left q) -> return (Left q, t')
                                              
 io       :: (Show a, Read a) => IO a -> Replay q r a
-io input = Replay $ \t -> do
+io input = ReplayT $ \t -> do
              case todo t of
                [] -> do a <- input
                         return (Right a, addResult t (show a))
@@ -40,7 +36,7 @@ io input = Replay $ \t -> do
                              Result str -> return (Right $ read str, addResult t str)
                       
 ask          :: q -> Replay q r r
-ask question = Replay $ \t -> do
+ask question = ReplayT $ \t -> do
                  case todo t of
                    [] -> return (Left question, t)
                    (val:ts) -> case val of
@@ -60,7 +56,7 @@ addAnswer     :: Trace r -> r -> Trace r
 addAnswer t r = Trace (visited t ++ [Answer r]) (tailSafe $ todo t)
 
 run      :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
-run ra t = do (qora, t') <- (runReplay ra) (resetTrace t)
+run ra t = do (qora, t') <- (runReplayT ra) (resetTrace t)
               case qora of
                 Left q -> return $ Left (q, t')
                 Right a -> return $ Right a
