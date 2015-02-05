@@ -60,7 +60,7 @@ addAnswer     :: Trace r -> r -> Trace r
 addAnswer t r = Trace (visited t ++ [Answer r]) (tailSafe $ todo t)
 
 run      :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
-run ra t = do (qora, t') <- (runReplay ra) t
+run ra t = do (qora, t') <- (runReplay ra) (resetTrace t)
               case qora of
                 Left q -> return $ Left (q, t')
                 Right a -> return $ Right a
