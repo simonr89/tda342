@@ -1,5 +1,6 @@
 module Main where
 
+import Test.QuickCheck hiding (Result)
 import Data.IORef
 import Replay
 import System.Exit
