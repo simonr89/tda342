@@ -23,4 +23,4 @@ Test-Suite test-replay
     type:            exitcode-stdio-1.0
     hs-source-dirs:  test
     main-is:         Test.hs
-    build-depends:   base, replay, QuickCheck
+    build-depends:   base, replay, QuickCheck, mtl
