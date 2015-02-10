@@ -27,7 +27,7 @@ data Item r = Answer r | Result String
               deriving (Show,Read)
 
                                              
-io       :: (Show a, Read a) => IO a -> Replay q r a
+io       :: (Show a, Read a, Monad m) => m a -> ReplayT m q r a
 io input = ReplayT $ \t -> do
              case todo t of
                [] -> do a <- input
@@ -36,7 +36,7 @@ io input = ReplayT $ \t -> do
                              Answer a -> fail "io"
                              Result str -> return (Right $ read str, addResult t str)
                       
-ask          :: q -> Replay q r r
+ask          :: (Monad m) => q -> ReplayT m q r r
 ask question = ReplayT $ \t -> do
                  case todo t of
                    [] -> return (Left question, t)
