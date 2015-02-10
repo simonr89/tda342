@@ -4,12 +4,15 @@ module Main where
 
 import Test.QuickCheck hiding (Result)
 import Control.Monad.State.Lazy
+import Control.Applicative
 import Data.Monoid
 import Data.IORef
 import Replay
 import System.Exit
+import System.IO.Unsafe
 
-type ReplayTest a = ReplayT (State Int) () Int a 
+--type ReplayTest a = ReplayT (State Int) () Int a 
+type ReplayTest a = ReplayT IO () Int a 
 
 instance (Show a) => Show (ReplayTest a) where
     show x = "replay"
@@ -18,11 +21,10 @@ instance (Show a) => Show (ReplayTest a) where
 -- | Runs the test suite for the replay library
 main :: IO ()
 main = do
-  quickCheck unit_right
-  -- results <- runTests
-  -- if and results
-  --   then return ()
-  --   else exitFailure
+  results <- runTests
+  if and results
+    then return ()
+    else exitFailure
 
 -- | Programs are parameterised over a 'tick' action.
 --   Questions are () and answers are integers.
@@ -43,69 +45,87 @@ data TestCase = TestCase
   }
 
 -- | Running a program.
--- runProgram :: Program -> Input -> IO Result
--- runProgram p inp = do
---     counter <- newIORef 0
---     let tick = modifyIORef counter (+1)
---     x <- play (p tick) emptyTrace inp
---     n <- readIORef counter
---     return (x, n)
---   where
---     play prog t inp = do
---       r <- run prog t
---       case r of
---         Right x      -> return x
---         Left (_, t') -> case inp of
---           []       -> error "too few inputs"
---           a : inp' -> play prog (addAnswer t' a) inp'
+runProgram :: Program -> Input -> IO Result
+runProgram p inp = do
+    counter <- newIORef 0
+    let tick = modifyIORef counter (+1)
+    x <- play (p tick) emptyTrace inp
+    n <- readIORef counter
+    return (x, n)
+  where
+    play prog t inp = do
+      r <- run prog t
+      case r of
+        Right x      -> return x
+        Left (_, t') -> case inp of
+          []       -> error "too few inputs"
+          a : inp' -> play prog (addAnswer t' a) inp'
 
 -- | Checking a test case. Compares expected and actual results.
--- checkTestCase :: TestCase -> IO Bool
--- checkTestCase (TestCase name i r p) = do
---   putStr $ name ++ ": "
---   r' <- runProgram p i
---   if r == r'
---     then putStrLn "ok" >> return True
---     else putStrLn ("FAIL: expected " ++ show r ++
---                   " instead of " ++ show r')
---          >> return False
+checkTestCase :: TestCase -> IO Bool
+checkTestCase (TestCase name i r p) = do
+  putStr $ name ++ ": "
+  r' <- runProgram p i
+  if r == r'
+    then putStrLn "ok" >> return True
+    else putStrLn ("FAIL: expected " ++ show r ++
+                  " instead of " ++ show r')
+         >> return False
 
 
 -- | List of interesting test cases.
 testCases :: [TestCase]
-testCases = undefined
-  -- [ TestCase
-  --   { testName    = "test1"
-  --   , testInput   = [3,4]
-  --   , testResult  = (8, 1)
-  --   , testProgram = \tick -> do
-  --       io tick
-  --       a <- ask () -- should be 3
-  --       b <- io (return 1)
-  --       c <- ask () -- should be 4
-  --       return (a + b + c)
-  --   }
-  --  , TestCase
-  --   { testName  = "test2"
-  --   , testInput   = [0,0]
-  --   , testResult  = (0, 2)
-  --   , testProgram = \tick -> do
-  --       io tick
-  --       a <- ask () -- should be 0
-  --       b <- io (return 0)
-  --       c <- ask () -- should be 0
-  --       io tick
-  --       return (a + b + c)
-  --   }
-  -- ]
+testCases = [
+     TestCase
+    { testName    = "test1"
+    , testInput   = [3,4]
+    , testResult  = (8, 1)
+    , testProgram = \tick -> do
+        io tick
+        a <- ask () -- should be 3
+        b <- io (return 1)
+        c <- ask () -- should be 4
+        return (a + b + c)
+    }
+   , TestCase
+    { testName  = "test2"
+    , testInput   = [0,0]
+    , testResult  = (0, 2)
+    , testProgram = \tick -> do
+        io tick
+        a <- ask () -- should be 0
+        b <- io (return 0)
+        c <- ask () -- should be 0
+        io tick
+        return (a + b + c)
+    }
+  ] ++ gens
 
-unit_right :: ReplayTest Int -> Bool
-unit_right m = undefined --(m >>= return) == m
+-- | Running all the test cases.
+runTests = mapM checkTestCase testCases
+
+
+gens = concatMap (unsafePerformIO . sample') [genTestCase "test3", genTestCase "test4", genTestCase "test5"]
+
+
+unit_right :: (Monad m, Eq (m a)) => m a -> Bool
+unit_right m = (m >>= return) == m
 
 
 instance (Arbitrary a) => Arbitrary (ReplayTest a) where
-   arbitrary = do x <- arbitrary
-                  elements [return x]
+   arbitrary = fmap return arbitrary
 
--- | Running all the test cases.
---runTests = mapM checkTestCase testCases
+
+
+genTestCase :: String -> Gen TestCase
+genTestCase testNam = do
+   testInp  <- arbitrary :: Gen Int
+   numTicks <- arbitrary `suchThat` (>0) :: Gen Int
+   let testRes = (testInp, numTicks)
+       testProg = \tick -> sequence_ (replicate numTicks (io tick)) >> return testInp
+
+{- For simplicity: just one tick combined with returning testInp
+
+       testProg = \tick -> io tick >> return testInp
+-}
+   return $ TestCase testNam [testInp] testRes testProg
