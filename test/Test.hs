@@ -1,27 +1,20 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module Main where
 
-import Test.QuickCheck hiding (Result)
-import Control.Monad.State.Lazy
-import Control.Applicative
-import Data.Monoid
-import Data.IORef
 import Replay
+import Control.Monad.State.Lazy
+import Data.IORef
 import System.Exit
-import System.IO.Unsafe
+import Test.QuickCheck (Gen,arbitrary,listOf,sample',suchThat)
+
 
 --type ReplayTest a = ReplayT (State Int) () Int a 
 type ReplayTest a = ReplayT IO () Int a 
 
-instance (Show a) => Show (ReplayTest a) where
-    show x = "replay"
-
-
 -- | Runs the test suite for the replay library
 main :: IO ()
 main = do
-  results <- runTests
+  testCases' <- sample' genTestCase
+  results <- runTests (testCases ++ testCases')
   if and results
     then return ()
     else exitFailure
@@ -99,33 +92,22 @@ testCases = [
         io tick
         return (a + b + c)
     }
-  ] ++ gens
+  ]
 
 -- | Running all the test cases.
-runTests = mapM checkTestCase testCases
+runTests = mapM checkTestCase
 
 
-gens = concatMap (unsafePerformIO . sample') [genTestCase "test3", genTestCase "test4", genTestCase "test5"]
-
-
-unit_right :: (Monad m, Eq (m a)) => m a -> Bool
-unit_right m = (m >>= return) == m
-
-
-instance (Arbitrary a) => Arbitrary (ReplayTest a) where
-   arbitrary = fmap return arbitrary
-
-
-
-genTestCase :: String -> Gen TestCase
-genTestCase testNam = do
-   testInp  <- arbitrary :: Gen Int
-   numTicks <- arbitrary `suchThat` (>0) :: Gen Int
-   let testRes = (testInp, numTicks)
-       testProg = \tick -> sequence_ (replicate numTicks (io tick)) >> return testInp
+genTestCase :: Gen TestCase
+genTestCase = do
+   testInp  <- listOf arbitrary           :: Gen [Int]
+   numTicks <- arbitrary `suchThat` (>0)  :: Gen Int
+   let testRes = (sum testInp, numTicks)
+       testNam = "test " ++ show (testInp, numTicks)
+       testProg = \tick -> sequence_ (replicate numTicks (io tick)) >> return (sum testInp)
 
 {- For simplicity: just one tick combined with returning testInp
 
        testProg = \tick -> io tick >> return testInp
 -}
-   return $ TestCase testNam [testInp] testRes testProg
+   return $ TestCase testNam testInp testRes testProg
