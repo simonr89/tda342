@@ -12,7 +12,10 @@ main = verboseCheck checkTestCase
 
 -- | Programs are parameterised over a 'tick' action.
 --   Questions are () and answers are integers.
-type Program = State Int () -> ReplayT (State Int) () Int Int
+type Program = ReplayT (State Int) () Int Int
+
+tick :: State Int ()
+tick = do {n <- get; put (n + 1)}
 
 -- | A result is a pair of the final result of the program
 --   and the number of 'ticks' executed.
@@ -34,22 +37,19 @@ instance Show TestCase
 -- | Running a program.
 runProgram :: Program -> Input -> State Int (Int, Int)
 runProgram p inp =
-    let tick = do { x <- get ; put (x + 1) }
-    in do
-  -- p :: Program
-  -- inp :: Input
-  --  put 0
-    x <- play (p tick) emptyTrace inp
-    n <- get
-    return (x, n)
-  where
-    play prog t inp = do
-      r <- run prog t
-      case r of
-        Right x      -> return x
-        Left (_, t') -> case inp of
-          []       -> error "too few inputs"
-          a : inp' -> play prog (addAnswer t' a) inp'
+    do
+      x <- play p emptyTrace inp
+      n <- get
+      return (x, n)
+    where
+      play prog t inp =
+          do
+            r <- run prog t
+            case r of
+              Right x      -> return x
+              Left (_, t') -> case inp of
+                                []       -> error "too few inputs"
+                                a : inp' -> play prog (addAnswer t' a) inp'
 
 -- | Checking a test case. Compares expected and actual results.
 checkTestCase :: TestCase -> Bool
@@ -63,7 +63,7 @@ testCases = [
     { testName    = "test1"
     , testInput   = [3,4]
     , testResult  = (8, 1)
-    , testProgram = \tick -> do
+    , testProgram = do
         io tick
         a <- ask () -- should be 3
         b <- io (return 1)
@@ -74,7 +74,7 @@ testCases = [
     { testName  = "test2"
     , testInput   = [0,0]
     , testResult  = (0, 2)
-    , testProgram = \tick -> do
+    , testProgram = do
         io tick
         a <- ask () -- should be 0
         b <- io (return 0)
@@ -88,22 +88,38 @@ testCases = [
 runTests :: [TestCase] -> Bool
 runTests = and . map checkTestCase
 
+data MonadElem = Tick | Return Int | Ask Int
+                 deriving (Eq)
 
+instance Arbitrary MonadElem where 
+    arbitrary = do
+      n <- arbitrary
+      elements [ Tick , Return n , Ask n ]
+                             
 genTestCase :: Gen TestCase
 genTestCase = do
-   testInp  <- listOf arbitrary           :: Gen [Int]
-   numTicks <- arbitrary `suchThat` (>0)  :: Gen Int
-   let testRes = (sum testInp, numTicks)    
-       testNam = "test" ++ show numTicks
-       testProg = \tick -> sequence_ (replicate numTicks (io tick)) >> return (sum testInp)
---                           return 0 >>
---                           foldl (>>=) (return 0) (map ask testInp)
-
-{- For simplicity: just one tick combined with returning testInp
-
-       testProg = \tick -> io tick >> return testInp
--}
-   return $ TestCase testNam testInp testRes testProg
+  l <- listOf arbitrary :: Gen [MonadElem]
+  let -- expected number of ticks
+      nTicks = length [ x | x <- l, x == Tick ]
+      -- expected result of the program
+      s = sum (map (\x -> case x of Tick -> 0
+                                    Return n -> n
+                                    Ask n -> n) l)
+      -- input list fed to the program
+      testInp = concatMap (\x -> case x of Tick -> []
+                                           Return n -> []
+                                           Ask n -> [n]) l
+      -- generate the program to be test
+      testProg = do { res <- sequence (map toMonad l) ;
+                      return $ sum res }
+               
+      testRes = (s, nTicks)    
+      testNam = "test" ++ show nTicks
+  return $ TestCase testNam testInp testRes testProg
+      where
+        toMonad (Tick)     = liftM (const 0) (io tick)
+        toMonad (Return n) = io (return n)
+        toMonad (Ask n)    = ask ()
 
 instance Arbitrary TestCase where
     arbitrary = genTestCase
