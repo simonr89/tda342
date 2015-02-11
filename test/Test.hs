@@ -4,24 +4,15 @@ import Replay
 import Control.Monad.State.Lazy
 import Data.IORef
 import System.Exit
-import Test.QuickCheck (Gen,arbitrary,listOf,sample',suchThat)
-
-
---type ReplayTest a = ReplayT (State Int) () Int a 
-type ReplayTest a = ReplayT IO () Int a 
+import Test.QuickCheck hiding (Result)
 
 -- | Runs the test suite for the replay library
 main :: IO ()
-main = do
-  testCases' <- sample' genTestCase
-  results <- runTests (testCases ++ testCases')
-  if and results
-    then return ()
-    else exitFailure
+main = verboseCheck checkTestCase
 
 -- | Programs are parameterised over a 'tick' action.
 --   Questions are () and answers are integers.
-type Program = IO () -> ReplayTest Int
+type Program = State Int () -> ReplayT (State Int) () Int Int
 
 -- | A result is a pair of the final result of the program
 --   and the number of 'ticks' executed.
@@ -36,14 +27,20 @@ data TestCase = TestCase
   , testResult  :: Result
   , testProgram :: Program
   }
+              
+instance Show TestCase
+    where show tc = testName tc ++ " " ++ show (testInput tc) ++ " " ++ show (testResult tc)
 
 -- | Running a program.
-runProgram :: Program -> Input -> IO Result
-runProgram p inp = do
-    counter <- newIORef 0
-    let tick = modifyIORef counter (+1)
+runProgram :: Program -> Input -> State Int (Int, Int)
+runProgram p inp =
+    let tick = do { x <- get ; put (x + 1) }
+    in do
+  -- p :: Program
+  -- inp :: Input
+  --  put 0
     x <- play (p tick) emptyTrace inp
-    n <- readIORef counter
+    n <- get
     return (x, n)
   where
     play prog t inp = do
@@ -55,16 +52,9 @@ runProgram p inp = do
           a : inp' -> play prog (addAnswer t' a) inp'
 
 -- | Checking a test case. Compares expected and actual results.
-checkTestCase :: TestCase -> IO Bool
-checkTestCase (TestCase name i r p) = do
-  putStr $ name ++ ": "
-  r' <- runProgram p i
-  if r == r'
-    then putStrLn "ok" >> return True
-    else putStrLn ("FAIL: expected " ++ show r ++
-                  " instead of " ++ show r')
-         >> return False
-
+checkTestCase :: TestCase -> Bool
+checkTestCase (TestCase name i r p) =
+    r == evalState (runProgram p i) 0
 
 -- | List of interesting test cases.
 testCases :: [TestCase]
@@ -95,7 +85,8 @@ testCases = [
   ]
 
 -- | Running all the test cases.
-runTests = mapM checkTestCase
+runTests :: [TestCase] -> Bool
+runTests = and . map checkTestCase
 
 
 genTestCase :: Gen TestCase
@@ -111,3 +102,6 @@ genTestCase = do
        testProg = \tick -> io tick >> return testInp
 -}
    return $ TestCase testNam testInp testRes testProg
+
+instance Arbitrary TestCase where
+    arbitrary = genTestCase

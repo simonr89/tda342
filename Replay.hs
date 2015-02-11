@@ -56,7 +56,7 @@ addResult t str = Trace (visited t ++ [Result str]) (tailSafe $ todo t)
 addAnswer     :: Trace r -> r -> Trace r
 addAnswer t r = Trace (visited t ++ [Answer r]) (tailSafe $ todo t)
 
-run      :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
+run      :: (Monad m) => ReplayT m q r a -> Trace r -> m (Either (q, Trace r) a)
 run ra t = do (qora, t') <- (runReplayT ra) (resetTrace t)
               case qora of
                 Left q -> return $ Left (q, t')
