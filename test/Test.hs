@@ -15,7 +15,7 @@ main = verboseCheck checkTestCase
 type Program = ReplayT (State Int) () Int Int
 
 tick :: State Int ()
-tick = do {n <- get; put (n + 1)}
+tick = do get >>= \n -> put (n + 1)
 
 -- | A result is a pair of the final result of the program
 --   and the number of 'ticks' executed.
@@ -32,7 +32,8 @@ data TestCase = TestCase
   }
               
 instance Show TestCase
-    where show tc = testName tc ++ ", " ++ show (testInput tc) ++ ", " ++ show (testResult tc)
+    where show tc = testName tc ++ " " ++ show (testInput tc) ++ 
+                    " " ++ show (testResult tc)
 
 -- | Running a program.
 runProgram :: Program -> Input -> State Int (Int, Int)
@@ -110,8 +111,8 @@ genTestCase = do
                                            Return n -> []
                                            Ask n -> [n]) l
       -- generate the program to be test
-      testProg = do { res <- sequence (map toMonad l) ;
-                      return $ sum res }
+      testProg = do res <- sequence (map toMonad l)
+                    return $ sum res
                
       testRes = (s, nTicks)    
       testNam = "test" ++ show nTicks
