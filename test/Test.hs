@@ -2,7 +2,7 @@ module Main where
 
 import Replay
 import Control.Monad.State.Lazy
-import Data.IORef
+import Data.Char
 import System.Exit
 import Test.QuickCheck hiding (Result)
 
@@ -29,7 +29,7 @@ data TestCase = TestCase
   }
               
 instance Show TestCase
-    where show tc = testName tc ++ " " ++ show (testInput tc) ++ " " ++ show (testResult tc)
+    where show tc = testName tc ++ ", " ++ show (testInput tc) ++ ", " ++ show (testResult tc)
 
 -- | Running a program.
 runProgram :: Program -> Input -> State Int (Int, Int)
@@ -93,9 +93,11 @@ genTestCase :: Gen TestCase
 genTestCase = do
    testInp  <- listOf arbitrary           :: Gen [Int]
    numTicks <- arbitrary `suchThat` (>0)  :: Gen Int
-   let testRes = (sum testInp, numTicks)
-       testNam = "test " ++ show (testInp, numTicks)
+   let testRes = (sum testInp, numTicks)    
+       testNam = "test" ++ show numTicks
        testProg = \tick -> sequence_ (replicate numTicks (io tick)) >> return (sum testInp)
+--                           return 0 >>
+--                           foldl (>>=) (return 0) (map ask testInp)
 
 {- For simplicity: just one tick combined with returning testInp
 
