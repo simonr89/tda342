@@ -7,12 +7,20 @@ trace = Trace [] [Result "2015-02-05 15:05:08.780997 UTC",
                   Result "()", Answer "27", Result "()", Answer "Simon", Result "()",
                   Result "2015-02-05 15:05:08.780997 UTC"]
 
+--    liftR . return = return
+--    liftR (m >>= f) = liftR m >>= (liftR . f)
+
+
+
 example :: Replay String String Int
 example = do
   t0 <- io getCurrentTime
   io (putStrLn "Hello!")
   age <- ask "What is your age?"
   io (putStrLn ("You are " ++ age))
+  let foo s = return (s++"!")
+--  liftR $ getLine >>= foo
+  liftR getLine >>= liftR . foo
   name <- ask "What is your name?"
   io (putStrLn (name ++ " is " ++ age ++ " years old"))
   t1 <- io getCurrentTime
@@ -26,6 +34,7 @@ running prog = play emptyTrace
     r <- run prog t    -- this is the same prog every time!
     case r of
       Left (q, t') -> do
+        print t'
         putStr ("Question: " ++ q ++ " ")
         r <- getLine
         play $ addAnswer t' r

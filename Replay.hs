@@ -1,4 +1,4 @@
-module Replay where
+module Replay where -- (Replay(..),ReplayT,Trace(..),ask,io,run, liftR, emptyTrace, addAnswer) where
 
 import Safe
 
@@ -22,16 +22,25 @@ instance (Monad m) => Monad (ReplayT m q r) where
                                      (Right a) -> runReplayT (k a) t'
                                      (Left q) -> return (Left q, t')
 
+
 -- | Extract a result of a monadic computation and add it to the trace.
--- Require type a to be instances of Show and Read to avoid later runtime errors.
--- This restriction makes it stricter than the lift function in the MonadTrans class.
+-- Require type a to be instances of Show and Read to be able to 
+-- read from the trace and add new results to the trace. 
+-- liftR doesn't satisfy the monad transformer laws: 
+--    liftR . return = return
+--    liftR (m >>= f) = liftR m >>= (liftR . f)
+-- In the first law, we can see from the definition of return that it doesn't manipulate the trace, but liftR does.
+-- As for the second law, lift occurs once  on the left hand side, and twice on the right hand side.
+-- Using the same reasoning, on the LHS the trace is modified once, and on the RHS twice.
+
+
 liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
 liftR input = ReplayT $ \t -> do
                case todo t of
                  [] -> do a <- input
                           return (Right a, addResult t (show a))
                  (val:ts) -> case val of
-                               Answer a -> fail "io"
+                               Answer a -> fail "liftR"
                                Result str -> return (Right $ read str, addResult t str)
 
 -- | Exctract either an answer or a question with a trace,
