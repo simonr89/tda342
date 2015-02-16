@@ -22,12 +22,17 @@ instance (Monad m) => Monad (ReplayT m q r) where
                                      (Right a) -> runReplayT (k a) t'
                                      (Left q) -> return (Left q, t')
 
--- | Lift a computation from the underlying monad to a Replay monad.
+-- | Extract a result of a monadic computation and add it to the trace.
 -- Require type a to be instances of Show and Read to avoid later runtime errors.
 -- This restriction makes it stricter than the lift function in the MonadTrans class.
 liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
-liftR m = ReplayT $ \t -> do a <- m
-                             return (Right a, t)
+liftR input = ReplayT $ \t -> do
+               case todo t of
+                 [] -> do a <- input
+                          return (Right a, addResult t (show a))
+                 (val:ts) -> case val of
+                               Answer a -> fail "io"
+                               Result str -> return (Right $ read str, addResult t str)
 
 -- | Exctract either an answer or a question with a trace,
 -- wrapped in the underlying monad.
@@ -37,15 +42,9 @@ run ra t = do (qora, t') <- (runReplayT ra) (resetTrace t)
                 Left q -> return $ Left (q, t')
                 Right a -> return $ Right a
 
--- | Extract a result of a monadic computation and adds it to the trace.
-io       :: (Show a, Read a, Monad m) => m a -> ReplayT m q r a
-io input = ReplayT $ \t -> do
-             case todo t of
-               [] -> do a <- input
-                        return (Right a, addResult t (show a))
-               (val:ts) -> case val of
-                             Answer a -> fail "io"
-                             Result str -> return (Right $ read str, addResult t str)
+-- | liftR specialised for IO actions
+io :: (Show a, Read a) => IO a -> ReplayT IO q r a
+io = liftR
 
 -- | Try to answer the question with the trace. 
 -- If the trace is empty, return the question and the used trace.

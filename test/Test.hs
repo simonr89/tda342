@@ -65,9 +65,9 @@ testCases = [
     , testInput   = [3,4]
     , testResult  = (8, 1)
     , testProgram = do
-        io tick
+        liftR tick
         a <- ask () -- should be 3
-        b <- io (return 1)
+        b <- liftR (return 1)
         c <- ask () -- should be 4
         return (a + b + c)
     }
@@ -76,11 +76,11 @@ testCases = [
     , testInput   = [0,0]
     , testResult  = (0, 2)
     , testProgram = do
-        io tick
+        liftR tick
         a <- ask () -- should be 0
-        b <- io (return 0)
+        b <- liftR (return 0)
         c <- ask () -- should be 0
-        io tick
+        liftR tick
         return (a + b + c)
     }
   ]
@@ -118,8 +118,8 @@ genTestCase = do
       testNam = "test" ++ show nTicks
   return $ TestCase testNam testInp testRes testProg
       where
-        toMonad (Tick)     = liftM (const 0) (io tick)
-        toMonad (Return n) = io (return n)
+        toMonad (Tick)     = liftM (const 0) (liftR tick)
+        toMonad (Return n) = liftR (return n)
         toMonad (Ask n)    = ask ()
 
 instance Arbitrary TestCase where
