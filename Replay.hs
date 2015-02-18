@@ -1,12 +1,11 @@
-module Replay (Replay(..)
+module Replay (Replay
              , ReplayT
-             , Trace(..)
-             , Item(..)
              , ask
              , io
              , run
              , liftR
              , emptyTrace
+             , addResult
              , addAnswer) where
 
 -- Types
