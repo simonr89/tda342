@@ -7,7 +7,7 @@ module Replay (Replay(..)
              , run
              , liftR
              , emptyTrace
-             , addAnswer) where
+             , substAnswer) where
 
 import Safe
 
@@ -16,8 +16,8 @@ type Replay q r a = ReplayT IO q r a
 
 newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 
-                     -- event up to now,    events left to consume
-data Trace r = Trace { visited :: [Item r], todo :: [Item r] }
+data Trace r = Trace { visited :: [Item r], -- ^ events up to now, in reverse order
+                       todo :: [Item r] }   -- ^ events left to consume
     deriving (Show,Read)
 
 data Item r = Answer r | Result String
@@ -58,13 +58,13 @@ liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
 liftR input = ReplayT $ \t -> do
                case todo t of
                  [] -> do a <- input
-                          return (Right a, addResult t (show a))
+                          return (Right a, substResult t (show a))
                  (val:ts) -> case val of
                                Answer a -> fail "liftR"
-                               Result str -> return (Right $ read str, addResult t str)
+                               Result str -> return (Right $ read str, substResult t str)
 
--- | Exctract either an answer or a question with a trace,
--- wrapped in the underlying monad.
+-- | Extract either an answer or a question with a trace, wrapped in
+-- the underlying monad.
 run      :: (Monad m) => ReplayT m q r a -> Trace r -> m (Either (q, Trace r) a)
 run ra t = do (qora, t') <- (runReplayT ra) (resetTrace t)
               case qora of
@@ -75,14 +75,14 @@ run ra t = do (qora, t') <- (runReplayT ra) (resetTrace t)
 io :: (Show a, Read a) => IO a -> ReplayT IO q r a
 io = liftR
 
--- | Try to answer the question with the trace. 
--- If the trace is empty, return the question and the used trace.
+-- | Try to answer the question with the trace.  If the trace is
+-- empty, return the question and the used trace.
 ask          :: (Monad m) => q -> ReplayT m q r r
 ask question = ReplayT $ \t -> do
                  case todo t of
                    [] -> return (Left question, t)
                    (val:ts) -> case val of
-                                 Answer a   -> return (Right a, addAnswer t a)
+                                 Answer a   -> return (Right a, substAnswer t a)
                                  Result str -> fail $ "ask: " ++ str
 
 
@@ -91,12 +91,17 @@ ask question = ReplayT $ \t -> do
 emptyTrace :: Trace r
 emptyTrace = Trace [] []
 
+-- | Put the visited elements back at the beginning of the todo list
 resetTrace :: Trace r -> Trace r
-resetTrace (Trace v t) = Trace [] (v ++ t)
+resetTrace (Trace v t) = Trace [] ((reverse v) ++ t)
 
-addResult       :: Trace r -> String -> Trace r
-addResult t str = Trace (visited t ++ [Result str]) (tailSafe $ todo t)
-             
-addAnswer     :: Trace r -> r -> Trace r
-addAnswer t r = Trace (visited t ++ [Answer r]) (tailSafe $ todo t)
+-- | Remove the next "todo" element from the trace and add a result to
+-- the visited elements
+substResult       :: Trace r -> String -> Trace r
+substResult t str = Trace ((Result str):visited t) (tailSafe $ todo t)
+
+-- | Remove the next "todo" element from the trace and add an answer
+-- to the visited elements
+substAnswer     :: Trace r -> r -> Trace r
+substAnswer t r = Trace ((Answer r):visited t) (tailSafe $ todo t)
 

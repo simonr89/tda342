@@ -42,5 +42,5 @@ running prog = play emptyTrace
       Left (q, t') -> do
         putStr ("Question: " ++ q ++ " ")
         r <- getLine
-        play $ addAnswer t' r
+        play $ substAnswer t' r
       Right x      -> return x
