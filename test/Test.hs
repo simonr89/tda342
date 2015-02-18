@@ -98,29 +98,30 @@ instance Arbitrary MonadElem where
       elements [ Tick , Return n , Ask n ]
                              
 genTestCase :: Gen TestCase
-genTestCase = do
-  l <- listOf arbitrary :: Gen [MonadElem]
-  let -- expected number of ticks
-      nTicks = length [ x | x <- l, x == Tick ]
-      -- expected result of the program
-      s = sum (map (\x -> case x of Tick -> 0
-                                    Return n -> n
-                                    Ask n -> n) l)
-      -- input list fed to the program
-      testInp = concatMap (\x -> case x of Tick -> []
-                                           Return n -> []
-                                           Ask n -> [n]) l
-      -- generate the program to be test
-      testProg = do res <- sequence (map toMonad l)
-                    return $ sum res
+genTestCase =
+    sized $ \n -> do
+      l <- vectorOf n arbitrary :: Gen [MonadElem]
+      let -- expected number of ticks
+          nTicks = length [ x | x <- l, x == Tick ]
+          -- expected result of the program
+          s = sum (map (\x -> case x of Tick -> 0
+                                        Return n -> n
+                                        Ask n -> n) l)
+          -- input list fed to the program
+          testInp = concatMap (\x -> case x of Tick -> []
+                                               Return n -> []
+                                               Ask n -> [n]) l
+          -- generate the program to be test
+          testProg = do res <- sequence (map toMonad l)
+                        return $ sum res
                
-      testRes = (s, nTicks)    
-      testNam = "test" ++ show nTicks
-  return $ TestCase testNam testInp testRes testProg
-      where
-        toMonad (Tick)     = liftM (const 0) (liftR tick)
-        toMonad (Return n) = liftR (return n)
-        toMonad (Ask n)    = ask ()
+          testRes = (s, nTicks)    
+          testNam = "test" ++ show nTicks
+      return $ TestCase testNam testInp testRes testProg
+          where
+            toMonad (Tick)     = liftM (const 0) (liftR tick)
+            toMonad (Return n) = liftR (return n)
+            toMonad (Ask n)    = ask ()
 
 instance Arbitrary TestCase where
     arbitrary = genTestCase
