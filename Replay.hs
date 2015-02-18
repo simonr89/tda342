@@ -7,9 +7,7 @@ module Replay (Replay(..)
              , run
              , liftR
              , emptyTrace
-             , substAnswer) where
-
-import Safe
+             , addAnswer) where
 
 -- Types
 type Replay q r a = ReplayT IO q r a 
@@ -58,10 +56,10 @@ liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
 liftR input = ReplayT $ \t -> do
                case todo t of
                  [] -> do a <- input
-                          return (Right a, substResult t (show a))
+                          return (Right a, addResult t (show a))
                  (val:ts) -> case val of
                                Answer a -> fail "liftR"
-                               Result str -> return (Right $ read str, substResult t str)
+                               Result str -> return (Right $ read str, visit t)
 
 -- | Extract either an answer or a question with a trace, wrapped in
 -- the underlying monad.
@@ -82,9 +80,8 @@ ask question = ReplayT $ \t -> do
                  case todo t of
                    [] -> return (Left question, t)
                    (val:ts) -> case val of
-                                 Answer a   -> return (Right a, substAnswer t a)
+                                 Answer a   -> return (Right a, visit t)
                                  Result str -> fail $ "ask: " ++ str
-
 
 -- Helper functions for manipulating traces
 
@@ -95,13 +92,17 @@ emptyTrace = Trace [] []
 resetTrace :: Trace r -> Trace r
 resetTrace (Trace v t) = Trace [] ((reverse v) ++ t)
 
--- | Remove the next "todo" element from the trace and add a result to
--- the visited elements
-substResult       :: Trace r -> String -> Trace r
-substResult t str = Trace ((Result str):visited t) (tailSafe $ todo t)
+-- | Add a result to the visited elements, assuming that the todo list is empty
+addResult                  :: Trace r -> String -> Trace r
+addResult (Trace v []) str =  Trace ((Result str):v) []
 
--- | Remove the next "todo" element from the trace and add an answer
--- to the visited elements
-substAnswer     :: Trace r -> r -> Trace r
-substAnswer t r = Trace ((Answer r):visited t) (tailSafe $ todo t)
+-- | Add an answer to the visited elements, assuming that the todo list is empty
+addAnswer                :: Trace r -> r -> Trace r
+addAnswer (Trace v []) r =  Trace ((Answer r):v) []
+
+-- |Move the first todo element to the visited elements list
+visit             :: Trace r -> Trace r
+visit (Trace v t) = case t of
+                      [] -> Trace v t
+                      (x:xs) -> Trace (x:v) xs
 

@@ -50,7 +50,7 @@ runProgram p inp =
               Right x      -> return x
               Left (_, t') -> case inp of
                                 []       -> error "too few inputs"
-                                a : inp' -> play prog (substAnswer t' a) inp'
+                                a : inp' -> play prog (addAnswer t' a) inp'
 
 -- | Checking a test case. Compares expected and actual results.
 checkTestCase :: TestCase -> Bool
