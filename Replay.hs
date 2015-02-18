@@ -1,5 +1,6 @@
 module Replay (Replay
              , ReplayT
+             , Trace
              , ask
              , io
              , run
@@ -13,8 +14,9 @@ type Replay q r a = ReplayT IO q r a
 
 newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 
-data Trace r = Trace { visited :: [Item r], -- ^ events up to now, in reverse order
-                       todo :: [Item r] }   -- ^ events left to consume
+data Trace r = Trace { visited :: [Item r] -- ^ events up to now, in reverse order
+                     , todo :: [Item r]    -- ^ events left to consume
+                     }
     deriving (Show,Read)
 
 data Item r = Answer r | Result String

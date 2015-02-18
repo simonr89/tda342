@@ -17,7 +17,7 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Replay, Webforms
   -- other-modules:       
-  build-depends:       base >= 4 && <5, scotty, text
+  build-depends:       base >= 4 && <5, scotty, text, transformers
 
 executable webform
   hs-source-dirs:      executable
