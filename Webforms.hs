@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Webforms (Web
-                ,runWeb
-                ) where
+module Webforms
+    ( Web
+    , Field(..)
+    , Question
+    , Answer
+    , runWeb
+    ) where
 
 import Control.Monad.IO.Class
-import Data.ByteString.Base64 as Base64
-import Data.ByteString.Char8 as Char8
-import Data.Text.Encoding as Encoding
-import Data.Text.Lazy as Lazy
+import Data.ByteString.Base64 as Base64 (encode, decode) 
+import Data.ByteString.Char8 as Char8 (pack, unpack)
+import Data.Monoid
+import Data.Text.Lazy as Lazy (Text, pack, unpack, append)
 import Replay
 import Web.Scotty
 
@@ -17,7 +21,7 @@ type Question = [Field]
 
 type Answer = [Text]
 
-data Field = Field { id :: Text
+data Field = Field { ident :: Text
                    , description :: Text
                    }
              deriving (Show, Read)
@@ -26,23 +30,34 @@ data Field = Field { id :: Text
 encodeTrace :: Trace Answer -> Text
 encodeTrace = Lazy.pack . Char8.unpack . Base64.encode . Char8.pack . show
 
+maybeRead     :: String -> Maybe (Trace Answer)
+maybeRead str = case reads str of
+                 [(x,"")] -> Just x
+                 _ -> Nothing            
+
 decodeTrace   :: Text -> Maybe (Trace Answer)
 decodeTrace t = case Base64.decode $ Char8.pack $ Lazy.unpack t of
-                  Left _err -> Nothing
-                  Right s -> Just $ read $ Char8.unpack s
+                  Left _ -> Nothing
+                  Right bstr -> maybeRead $ Char8.unpack bstr
 
 -- (Trace Answer -> IO ((Either Question ()), Trace Answer) -> ActionM ()
-runWeb   :: Web () -> ActionM ()
+runWeb   :: Web Answer -> ActionM ()
 runWeb w = do
   input <- param "trace" `rescue` (\_ -> return "")
-  let t = case decodeTrace input of
-            Nothing -> emptyTrace
-            Just t -> t
-  r <- liftIO $ run w t
+  let trace = case decodeTrace input of
+                Nothing -> emptyTrace
+                Just t -> t
+  r <- liftIO $ run w trace
   case r of
     Left (q, t') -> sendForm q
-    Right x -> return x
+    Right x -> return ()
 
 sendForm :: Question -> ActionM ()
-sendForm q = html "<html><body></body></html>"
+sendForm q = html $
+             "<html><body>" `append`
+             mconcat (map printField q) `append`
+             "</body></html>"
 
+printField   :: Field -> Text
+printField f =
+    "<p>" `append` (description f) `append` "</p><input name=" `append` (ident f) `append` ">"
