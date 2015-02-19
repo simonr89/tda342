@@ -40,7 +40,7 @@ decodeTrace t = case Base64.decode $ Char8.pack $ Lazy.unpack t of
                   Left _ -> Nothing
                   Right bstr -> maybeRead $ Char8.unpack bstr
 
--- (Trace Answer -> IO ((Either Question ()), Trace Answer) -> ActionM ()
+-- not 100% sure what the argument type in Web ? should be
 runWeb   :: Web Answer -> ActionM ()
 runWeb w = do
   input <- param "trace" `rescue` (\_ -> return "")
@@ -54,9 +54,9 @@ runWeb w = do
 
 sendForm :: Question -> ActionM ()
 sendForm q = html $
-             "<html><body>" `append`
+             "<html><body><form method=post>" `append`
              mconcat (map printField q) `append`
-             "</body></html>"
+             "</form><input type=submit value=OK></body></html>"
 
 printField   :: Field -> Text
 printField f =
