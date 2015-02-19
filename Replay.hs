@@ -57,7 +57,7 @@ liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
 liftR input = ReplayT $ \t -> do
                case todo t of
                  [] -> do a <- input
-                          return (Right a, addResult t (show a))
+                          return (Right a, addResult (show a) t)
                  (val:ts) -> case val of
                                Answer a -> fail "liftR"
                                Result str -> return (Right $ read str, visit t)
@@ -94,12 +94,12 @@ resetTrace :: Trace r -> Trace r
 resetTrace (Trace v t) = Trace [] ((reverse v) ++ t)
 
 -- | Add a result to the visited elements, assuming that the todo list is empty
-addResult                  :: Trace r -> String -> Trace r
-addResult (Trace v []) str =  Trace ((Result str):v) []
+addResult                  :: String -> Trace r -> Trace r
+addResult str (Trace v []) =  Trace ((Result str):v) []
 
 -- | Add an answer to the visited elements, assuming that the todo list is empty
-addAnswer                :: Trace r -> r -> Trace r
-addAnswer (Trace v []) r =  Trace ((Answer r):v) []
+addAnswer                :: r ->Trace r -> Trace r
+addAnswer r (Trace v []) =  Trace ((Answer r):v) []
 
 -- |Move the first todo element to the visited elements list
 visit             :: Trace r -> Trace r

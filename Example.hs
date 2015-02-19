@@ -3,10 +3,15 @@ module Example where
 import Replay
 import Data.Time
 
-trace = Trace [] [Result "2015-02-05 15:05:08.780997 UTC",
-                  Result "()", Answer "27", Result "()", Answer "Simon", Result "()",
-                  Result "2015-02-05 15:05:08.780997 UTC"]
-
+trace =
+    addResult "2015-02-05 15:05:08.780997 UTC" $
+    addResult "()" $
+    addAnswer "27" $
+    addResult "()" $
+    addAnswer "Simon" $
+    addResult "()" $
+    addResult "2015-02-05 15:05:08.780997 UTC" $
+    emptyTrace
 
 example :: Replay String String Int
 example = do
@@ -42,5 +47,5 @@ running prog = play emptyTrace
       Left (q, t') -> do
         putStr ("Question: " ++ q ++ " ")
         r <- getLine
-        play $ substAnswer t' r
+        play $ addAnswer r t'
       Right x      -> return x
