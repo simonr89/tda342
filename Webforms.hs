@@ -4,7 +4,10 @@ module Webforms (Web
                 ) where
 
 import Control.Monad.IO.Class
-import Data.Text.Lazy
+import Data.ByteString.Base64 as Base64
+import Data.ByteString.Char8 as Char8
+import Data.Text.Encoding as Encoding
+import Data.Text.Lazy as Lazy
 import Replay
 import Web.Scotty
 
@@ -17,12 +20,16 @@ type Answer = [Text]
 data Field = Field { id :: Text
                    , description :: Text
                    }
+             deriving (Show, Read)
 
-encodeTrace   :: Trace Answer -> Text
-encodeTrace t = error "undefined"
+-- TODO deal with line break interspersing
+encodeTrace :: Trace Answer -> Text
+encodeTrace = Lazy.pack . Char8.unpack . Base64.encode . Char8.pack . show
 
 decodeTrace   :: Text -> Maybe (Trace Answer)
-decodeTrace t = error "undefined"
+decodeTrace t = case Base64.decode $ Char8.pack $ Lazy.unpack t of
+                  Left _err -> Nothing
+                  Right s -> Just $ read $ Char8.unpack s
 
 -- (Trace Answer -> IO ((Either Question ()), Trace Answer) -> ActionM ()
 runWeb   :: Web () -> ActionM ()

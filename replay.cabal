@@ -17,15 +17,25 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Replay, Webforms
   -- other-modules:       
-  build-depends:       base >= 4 && <5, scotty, text, transformers
+  build-depends:       base >= 4 && <5,
+                       base64-bytestring,
+                       bytestring,
+                       scotty,
+                       text,
+                       transformers
 
 executable webform
   hs-source-dirs:      executable
-  build-depends:       base >= 4 && < 5, scotty, replay
+  build-depends:       base >= 4 && < 5,
+                       replay,
+                       scotty
   main-is: Main.hs
 
 Test-Suite test-replay
     type:            exitcode-stdio-1.0
     hs-source-dirs:  test
     main-is:         Test.hs
-    build-depends:   base, replay, QuickCheck, mtl
+    build-depends:   base,
+                     QuickCheck,
+                     mtl,
+                     replay
