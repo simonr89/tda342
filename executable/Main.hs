@@ -18,10 +18,10 @@ secondPage =
     ]
 
 exampleMonad :: Web Answer
-exampleMonad = do --io $ putStrLn "asking the first questions!"
-                  first <- ask exampleForm
-                  second <- ask secondPage
-                  return second
+exampleMonad = do ask exampleForm
+                  ask secondPage
+
+                  
 
 main :: IO ()
 main = scotty 3000 $ do

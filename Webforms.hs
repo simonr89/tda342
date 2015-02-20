@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 module Webforms
     ( Web
     , Field(..)
@@ -7,6 +7,7 @@ module Webforms
     , runWeb
     ) where
 
+import Control.Exception (try)
 import Control.Monad.IO.Class
 import Data.ByteString.Base64 as Base64 (encode, decode) 
 import Data.ByteString.Char8 as Char8 (pack, unpack)
@@ -15,7 +16,9 @@ import Data.Monoid
 import Data.Text.Lazy as Lazy (Text, pack, unpack, append, fromChunks)
 import Text.Read as Read (read)
 import Replay
+import System.IO.Unsafe
 import Web.Scotty
+import Web.Scotty.Trans (ScottyError)
 
 type Web a = Replay Question Answer a
 
@@ -42,22 +45,43 @@ decodeTrace t = case Base64.decode $ Char8.pack $ Lazy.unpack t of
                   Left _ -> Nothing
                   Right bstr -> maybeRead $ Char8.unpack bstr
 
-exampleTrace = addAnswer [Lazy.pack "Inari"] $
-               emptyTrace 
-
 -- not 100% sure what the argument type in Web ? should be
 runWeb   :: Web Answer -> ActionM ()
 runWeb w = do
   input <- param "trace" `rescue` (\_ -> return "")
   let trace = case decodeTrace input of
-                Nothing -> exampleTrace --With this starts from the second page
---                Nothing -> emptyTrace
+                 Nothing -> emptyTrace
+                 Just t -> t
+  play trace
+  where
+    play t = do
+      r <- liftIO $ run w t
+      case r of 
+        Left (q, t') -> do
+          answers <- mapM (maybeParam . ident) q
+          --sendForm q $ addAnswer (catMaybes answers) t'
+          liftIO $ putStrLn (show answers)
+          if any (==Nothing) answers 
+            then sendForm q t'
+            else play $ addAnswer (catMaybes answers) t 
+        Right x -> return ()
+      where unsafeMaybeParam :: Text -> ActionM (Maybe Text)
+            unsafeMaybeParam x = do liftIO $ print x
+                                    t <- param x
+                                    liftIO $ print (x,t)
+                                    return (Just t)
+            maybeParam :: Text -> ActionM (Maybe Text)                        
+            maybeParam x = unsafeMaybeParam x `rescue` (\_ -> return Nothing)
+{- do
+  input <- param "trace" `rescue` (\_ -> return "")
+  let trace = case decodeTrace input of
+                Nothing -> emptyTrace
                 Just t -> t
   r <- liftIO $ run w trace
   case r of
-    Left (q, t') -> sendForm q (addAnswer ([Lazy.pack "this value added by runWeb"]) t')
+    Left (q, t') -> sendForm q (addAnswer ([Lazy.pack "**added by runWeb**"]) t')
     Right x -> return ()
-
+-}
 sendForm :: Question -> Trace Answer -> ActionM ()
 sendForm q t = html $
              "<html><body><form method=get />\n" `append`
@@ -70,5 +94,4 @@ printField f =
     "<p>" `append` (description f) `append` "</p>\t<input name=" `append` (ident f) `append` "/>\n"
 
 hiddenFields :: Trace Answer -> Text
-hiddenFields t = "<input type=hidden name=HIDDEN value=\"" `append` values `append` "\" />\n"
-  where values = foldr1 append (concat $ getAnswers t)
+hiddenFields t = "<input type=hidden name=trace value=\"" `append` encodeTrace t `append` "\" />\n"
