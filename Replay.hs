@@ -1,13 +1,14 @@
 module Replay (Replay
              , ReplayT
-             , Trace
+             , Trace(..)
              , ask
              , io
              , run
              , liftR
              , emptyTrace
              , addResult
-             , addAnswer) where
+             , addAnswer
+             , getAnswers) where
 
 -- Types
 type Replay q r a = ReplayT IO q r a 
@@ -106,4 +107,12 @@ visit             :: Trace r -> Trace r
 visit (Trace v t) = case t of
                       [] -> Trace v t
                       (x:xs) -> Trace (x:v) xs
+
+-- | Extract the answers of a Trace
+getAnswers :: Trace r -> [r]
+getAnswers (Trace vis todo) = [getAnswer r | r <- vis, isAnswer r] 
+  where isAnswer (Answer _) = True
+        isAnswer _          = False
+        getAnswer (Answer r) = r
+        getAnswer _          = error "D:"
 
