@@ -11,8 +11,16 @@ exampleForm =
     , Field "firstname" "First name?"
     ]
 
+secondPage :: Question
+secondPage =
+    [ Field "catname" "What's the name of your cat?"
+    , Field "havecat" "What do you mean you don't have a cat?"
+    ]
+
 exampleMonad :: Web Answer
-exampleMonad = ask exampleForm
+exampleMonad = do first <- ask exampleForm
+                  second <- ask secondPage
+                  return second
 
 main :: IO ()
 main = scotty 3000 $ do

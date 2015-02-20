@@ -56,7 +56,7 @@ sendForm :: Question -> ActionM ()
 sendForm q = html $
              "<html><body><form method=post>" `append`
              mconcat (map printField q) `append`
-             "</form><input type=submit value=OK></body></html>"
+             "<input type=submit value=OK></form></body></html>"
 
 printField   :: Field -> Text
 printField f =
