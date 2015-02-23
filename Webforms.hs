@@ -59,39 +59,26 @@ runWeb w = do
       case r of 
         Left (q, t') -> do
           answers <- mapM (maybeParam . ident) q
-          --sendForm q $ addAnswer (catMaybes answers) t'
-          liftIO $ putStrLn (show answers)
           if any (==Nothing) answers 
             then sendForm q t'
             else play $ addAnswer (catMaybes answers) t 
         Right x -> return ()
-      where unsafeMaybeParam :: Text -> ActionM (Maybe Text)
-            unsafeMaybeParam x = do liftIO $ print x
-                                    t <- param x
-                                    liftIO $ print (x,t)
-                                    return (Just t)
-            maybeParam :: Text -> ActionM (Maybe Text)                        
-            maybeParam x = unsafeMaybeParam x `rescue` (\_ -> return Nothing)
-{- do
-  input <- param "trace" `rescue` (\_ -> return "")
-  let trace = case decodeTrace input of
-                Nothing -> emptyTrace
-                Just t -> t
-  r <- liftIO $ run w trace
-  case r of
-    Left (q, t') -> sendForm q (addAnswer ([Lazy.pack "**added by runWeb**"]) t')
-    Right x -> return ()
--}
+
+-- A more convenient way to get parameters
+maybeParam :: Text -> ActionM (Maybe Text)                        
+maybeParam x = (param x >>= return . Just) `rescue` (\_ -> return Nothing)
+
 sendForm :: Question -> Trace Answer -> ActionM ()
 sendForm q t = html $
-             "<html><body><form method=get />\n" `append`
-             hiddenFields t `append`
+             "<html><body><form method=post />\n" `append`
+             hiddenTraceField t `append`
              mconcat (map printField q) `append`
              "<input type=submit value=OK /></form></body></html>\n"
 
 printField   :: Field -> Text
 printField f =
-    "<p>" `append` (description f) `append` "</p>\t<input name=" `append` (ident f) `append` "/>\n"
+    "<p>" `append` description f `append` "</p><input name=" `append` ident f `append` " />\n"
 
-hiddenFields :: Trace Answer -> Text
-hiddenFields t = "<input type=hidden name=trace value=\"" `append` encodeTrace t `append` "\" />\n"
+hiddenTraceField   :: Trace Answer -> Text
+hiddenTraceField t =
+    "<input type=hidden name=trace value=\"" `append` encodeTrace t `append` "\" />\n"
