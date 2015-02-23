@@ -6,16 +6,18 @@ import Web.Scotty
 import Webforms
 
 exampleForm :: Question
-exampleForm =
-    [ Field "lastname" "Last name?"
-    , Field "firstname" "First name?"
-    ]
+exampleForm = Question { par = "hello"
+                       , fields = [ Field "lastname" "Last name?"
+                                  , Field "firstname" "First name?"
+                                  ]
+                       }
 
 secondPage :: Question
-secondPage =
-    [ Field "catname" "What's the name of your cat?"
-    , Field "havecat" "What do you mean you don't have a cat?"
-    ]
+secondPage = Question { par = "you again?"
+                      , fields = [ Field "catname" "What's the name of your cat?"
+                                 , Field "havecat" "What do you mean you don't have a cat?"
+                                 ]
+                      }
 
 exampleMonad :: Web Answer
 exampleMonad = do ask exampleForm

@@ -2,7 +2,7 @@
 module Webforms
     ( Web
     , Field(..)
-    , Question
+    , Question(..)
     , Answer
     , runWeb
     ) where
@@ -22,7 +22,9 @@ import Web.Scotty.Trans (ScottyError)
 
 type Web a = Replay Question Answer a
 
-type Question = [Field]
+data Question = Question { par :: Text       -- ^ some descriptive text
+                         , fields :: [Field] -- ^ the fields
+                         }
 
 type Answer = [Text]
 
@@ -58,7 +60,7 @@ runWeb w = do
       r <- liftIO $ run w t
       case r of 
         Left (q, t') -> do
-          answers <- mapM (maybeParam . ident) q
+          answers <- mapM (maybeParam . ident) $ fields q
           if any (==Nothing) answers 
             then sendForm q t'
             else play $ addAnswer (catMaybes answers) t 
@@ -70,9 +72,11 @@ maybeParam x = (param x >>= return . Just) `rescue` (\_ -> return Nothing)
 
 sendForm :: Question -> Trace Answer -> ActionM ()
 sendForm q t = html $
-             "<html><body><form method=post />\n" `append`
+             "<html><body><p>" `append`
+             par q `append`
+             "</p><form method=post />\n" `append`
              hiddenTraceField t `append`
-             mconcat (map printField q) `append`
+             mconcat (map printField $ fields q) `append`
              "<input type=submit value=OK /></form></body></html>\n"
 
 printField   :: Field -> Text
