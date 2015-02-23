@@ -7,13 +7,12 @@ module Webforms
     , runWeb
     ) where
 
-import Control.Exception (try)
 import Control.Monad.IO.Class
 import Data.ByteString.Base64 as Base64 (encode, decode) 
 import Data.ByteString.Char8 as Char8 (pack, unpack)
 import Data.Maybe
 import Data.Monoid
-import Data.Text.Lazy as Lazy (Text, pack, unpack, append, fromChunks)
+import Data.Text.Lazy as Lazy (Text, pack, unpack, append)
 import Text.Read as Read (read)
 import Replay
 import System.IO.Unsafe
@@ -24,7 +23,8 @@ type Web a = Replay Question Answer a
 
 data Question = Question { par :: Text       -- ^ some descriptive text
                          , fields :: [Field] -- ^ the fields
-                         }
+                         } 
+                deriving (Show,Read)
 
 type Answer = [Text]
 
