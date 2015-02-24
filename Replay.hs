@@ -1,6 +1,7 @@
+-- | A module for replayable computations
 module Replay (Replay
              , ReplayT
-             , Trace(..)
+             , Trace
              , ask
              , io
              , run
@@ -9,18 +10,29 @@ module Replay (Replay
              , emptyTrace
              , addResult
              , addAnswer
+             , addNewCut
              , getAnswers) where
 
 -- Types
-type Replay q r a = ReplayT IO q r a 
 
+-- | A monad transformer for replayable computations. The computation
+-- produces a trace that can be used as an argument for future
+-- replays. 'q' is the type of question that can be asked of the user,
+-- 'a' is the return type of the underlying monad 'm' and 'r' is the
+-- type of elements recorded in traces.
 newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 
+-- | A version of replay T specialized for IO computation
+type Replay q r a = ReplayT IO q r a
+
+-- | The type of traces. Use the 'emptyTrace' and the 'addX' function
+-- to build traces
 data Trace r = Trace { visited :: [Item r] -- ^ events up to now, in reverse order
                      , todo :: [Item r]    -- ^ events left to consume
                      }
     deriving (Show,Read)
 
+-- | The type of elements stored in traces
 data Item r = Answer r           -- ^ a user answer
             | Result String      -- ^ the result of a (m a) computation, stored with 'show'
             | Cut (Maybe String) -- ^ a cut, storing the result if it has been computed already
@@ -34,15 +46,14 @@ instance (Monad m) => Monad (ReplayT m q r) where
                                      (Left q) -> return (Left q, t')
                                      (Right a) -> runReplayT (k a) t'
 
--- | Extract a result of a monadic computation and add it to the trace.
--- Require type a to be instances of Show and Read to be able to 
--- read from the trace and add new results to the trace. 
 
 {- liftR doesn't satisfy the monad transformer laws: 
 
   (1)   liftR . return <> return
 
-   Our definition of return doesn't manipulate the trace, but liftR does.
+   Our definition of return doesn't check the trace, but liftR
+   does. Given e.g. a malformed trace, the resulting monads will
+   have different behaviors.
 
 
   (2)   liftR (m >>= f) <> liftR m >>= (liftR . f)
@@ -56,6 +67,10 @@ instance (Monad m) => Monad (ReplayT m q r) where
     λ> running twoLifts
 
 -}
+
+-- | Extract a result of a monadic computation and add it to the
+-- trace.  Require type a to be instances of Show and Read to be able
+-- to read from the trace and add new results to the trace.
 liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
 liftR input = ReplayT $ \t ->
               case todo t of
@@ -85,7 +100,11 @@ ask question = ReplayT $ \t ->
                  (Answer a:_) -> return (Right a, visit t)
                  _ -> fail "mismatched trace: ask expected"
 
--- Trace r -> m ((Either q a), Trace r)
+-- | Generate an optimized version of a replay monad. The trace
+-- produced by that version will contain intermdiary results only if
+-- the final result has not been computed. Otherwise all intermediary
+-- results are forgotten, leading to a more space-efficient trace and
+-- faster replays
 cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
 cut ra = ReplayT $ \t ->
          case todo t of
@@ -93,12 +112,13 @@ cut ra = ReplayT $ \t ->
            (Cut Nothing:_) -> do (qora, t') <- runReplayT ra (visit t)
                                  case qora of
                                    Left q -> return (Left q, t')
-                                   Right a -> return (Right a, registerCut (show a) t')
+                                   Right a -> return (Right a, registerCut a t')
            (Cut (Just str):_) -> return (Right $ read str, visit t)
            _ -> fail "mismatched trace: cut expected"
 
 --Helper functions for manipulating traces
 
+-- | The initial, empty trace
 emptyTrace :: Trace r
 emptyTrace = Trace [] []
 
@@ -106,20 +126,27 @@ emptyTrace = Trace [] []
 resetTrace :: Trace r -> Trace r
 resetTrace (Trace v t) = Trace [] ((reverse v) ++ t)
 
--- | Add a result to the visited elements, assuming that the todo list is empty
+-- | Add a result to the visited elements, assuming that the todo list
+-- is empty
 addResult                  :: String -> Trace r -> Trace r
 addResult str (Trace v []) =  Trace ((Result str):v) []
 
--- | Add an answer to the visited elements, assuming that the todo list is empty
+-- | Add an answer to the visited elements, assuming that the todo
+-- list is empty
 addAnswer                :: r ->Trace r -> Trace r
 addAnswer r (Trace v []) =  Trace ((Answer r):v) []
 
+-- | Add a new cut (without a saved result) to the visited elements,
+-- assuming that the todo list is empty
 addNewCut             :: Trace r -> Trace r
-addNewCut (Trace v t) = Trace (Cut Nothing:v) t
+addNewCut (Trace v []) = Trace (Cut Nothing:v) []
 
-registerCut                               :: String -> Trace r -> Trace r
-registerCut str (Trace v t) = Trace (unstack v) t
-    where unstack (Cut Nothing:vs) = Cut (Just str):vs
+-- | Saves a value in the last (chronological order) new cut in the
+-- trace. Every visited element after that cut is removed, as they are
+-- now not needed. The todo queue is left unchanged
+registerCut               :: (Show a) => a -> Trace r -> Trace r
+registerCut x (Trace v t) = Trace (unstack v) t
+    where unstack (Cut Nothing:vs) = (Cut $ Just $ show x):vs
           unstack (_:vs)           = vs
 
 -- | Move the first todo element to the visited elements list
