@@ -61,12 +61,12 @@ runWeb w = do
       case r of 
         Left (q, t') -> do
           answers <- mapM (maybeParam . ident) $ fields q
-          if any (==Nothing) answers 
+          if Nothing `elem` answers
             then sendForm q t'
             else play $ addAnswer (catMaybes answers) t 
         Right x -> return ()
 
--- A more convenient way to get parameters
+-- A more convenient way to get parameters, with Maybe rather than an exception
 maybeParam :: Text -> ActionM (Maybe Text)                        
 maybeParam x = (param x >>= return . Just) `rescue` (\_ -> return Nothing)
 
