@@ -26,7 +26,7 @@ data Question = Question { par :: Text       -- ^ some descriptive text
                          } 
                 deriving (Show,Read)
 
-type Answer = [Text]
+type Answer = [(Text,Text)]
 
 data Field = Field { ident :: Text
                    , description :: Text
@@ -47,13 +47,13 @@ decodeTrace t = case Base64.decode $ Char8.pack $ Lazy.unpack t of
                   Left _ -> Nothing
                   Right bstr -> maybeRead $ Char8.unpack bstr
 
--- not 100% sure what the argument type in Web ? should be
 runWeb   :: Web Answer -> ActionM ()
 runWeb w = do
   input <- param "trace" `rescue` (\_ -> return "")
   let trace = case decodeTrace input of
                  Nothing -> emptyTrace
                  Just t -> t
+  liftIO $ print trace
   play trace
   where
     play t = do
@@ -61,14 +61,16 @@ runWeb w = do
       case r of 
         Left (q, t') -> do
           answers <- mapM (maybeParam . ident) $ fields q
+          liftIO $ print answers
           if Nothing `elem` answers
             then sendForm q t'
             else play $ addAnswer (catMaybes answers) t 
         Right x -> return ()
 
 -- A more convenient way to get parameters, with Maybe rather than an exception
-maybeParam :: Text -> ActionM (Maybe Text)                        
-maybeParam x = (param x >>= return . Just) `rescue` (\_ -> return Nothing)
+maybeParam       :: Text -> ActionM (Maybe (Text, Text))
+maybeParam ident = (param ident >>= return . (\x -> Just (ident, x)))
+                   `rescue` (\_ -> return Nothing)
 
 sendForm :: Question -> Trace Answer -> ActionM ()
 sendForm q t = html $
