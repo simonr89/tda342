@@ -30,6 +30,7 @@ type Answer = [(Text,Text)]
 
 data Field = Field { ident :: Text
                    , description :: Text
+                   , visible :: Bool
                    }
              deriving (Show, Read)
 
@@ -82,8 +83,10 @@ sendForm q t = html $
              "<input type=submit value=OK /></form></body></html>\n"
 
 printField   :: Field -> Text
-printField f =
-    "<p>" `append` description f `append` "</p><input name=" `append` ident f `append` " />\n"
+printField f = if visible f
+               then "<p>" `append` description f `append`
+                        "</p><input name=" `append` ident f `append` " />\n"
+               else "<input type=hidden name=" `append` ident f `append` " />"
 
 hiddenTraceField   :: Trace Answer -> Text
 hiddenTraceField t =
