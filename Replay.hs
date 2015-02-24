@@ -5,6 +5,7 @@ module Replay (Replay
              , io
              , run
              , liftR
+             , cut
              , emptyTrace
              , addResult
              , addAnswer

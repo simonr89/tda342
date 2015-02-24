@@ -15,7 +15,7 @@ main = verboseCheck checkTestCase
 type Program = ReplayT (State Int) () Int Int
 
 tick :: State Int ()
-tick = do get >>= \n -> put (n + 1)
+tick = get >>= \n -> put (n + 1)
 
 -- | A result is a pair of the final result of the program
 --   and the number of 'ticks' executed.
@@ -50,7 +50,7 @@ runProgram p inp =
               Right x      -> return x
               Left (_, t') -> case inp of
                                 []       -> error "too few inputs"
-                                a : inp' -> play prog (addAnswer t' a) inp'
+                                a : inp' -> play prog (addAnswer a t') inp'
 
 -- | Checking a test case. Compares expected and actual results.
 checkTestCase :: TestCase -> Bool
@@ -61,7 +61,7 @@ checkTestCase (TestCase name i r p) =
 testCases :: [TestCase]
 testCases = [
      TestCase
-    { testName    = "test1"
+    { testName    = "basic_test1"
     , testInput   = [3,4]
     , testResult  = (8, 1)
     , testProgram = do
@@ -72,7 +72,7 @@ testCases = [
         return (a + b + c)
     }
    , TestCase
-    { testName  = "test2"
+    { testName    = "basic_test2"
     , testInput   = [0,0]
     , testResult  = (0, 2)
     , testProgram = do
@@ -83,6 +83,12 @@ testCases = [
         liftR tick
         return (a + b + c)
     }
+   , TestCase
+   { testName    = "cut_test1"
+   , testInput   = [0,0]
+   , testResult  = (0, 0)
+   , testProgram = cut (return 0)
+   }
   ]
 
 -- | Running all the test cases.
