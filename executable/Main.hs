@@ -2,21 +2,28 @@
 module Main where
 
 import Control.Monad
-import Data.Text.Lazy as Lazy (Text, pack, append)
+import Data.Map
+import Data.Text.Lazy as Text (Text, pack, unpack, append, split)
 import Replay
+import System.Process
 import Web.Scotty
 import Webforms
 
 form          :: Text -> Int -> Question
-form t formid = Question { par = "You typed " `append` t
-                         , fields = [ Field "thatfield" "Input?" True
-                                    , Field (append "form" (Lazy.pack $ show formid)) "" False
+form t formid = Question { par = "Available commands are: ls, cd, pwd and cat\n\n" `append` t
+                         , fields = [ Field "cmd" "Command?" True
+                                    , Field (append "form" (Text.pack $ show formid)) "" False
                                     ]
                          }
 
 exampleMonad      :: Text -> Int -> Web Answer
 exampleMonad t id = do ans <- ask $ form t id
-                       exampleMonad (snd $ head ans) (id + 1)
+                       let cmd = Data.Map.findWithDefault "" "cmd" ans
+                           str = case Text.split (==' ') cmd of
+                                   [] -> ""
+                                   v:_ -> Text.unpack v
+                       res <- io $ readProcess str [] []
+                       exampleMonad (Text.pack res) (id + 1)
 
 main :: IO ()
 main = scotty 3000 $ do
@@ -24,4 +31,4 @@ main = scotty 3000 $ do
     post "/" serve
   where
     serve :: ActionM ()
-    serve = runWeb $ exampleMonad "...nothing yet! First time here?" 0
+    serve = runWeb $ exampleMonad "" 0

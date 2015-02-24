@@ -10,6 +10,7 @@ module Webforms
 import Control.Monad.IO.Class
 import Data.ByteString.Base64 as Base64 (encode, decode) 
 import Data.ByteString.Char8 as Char8 (pack, unpack)
+import Data.Map (Map, fromList)
 import Data.Maybe
 import Data.Monoid
 import Data.Text.Lazy as Lazy (Text, pack, unpack, append)
@@ -26,7 +27,7 @@ data Question = Question { par :: Text       -- ^ some descriptive text
                          } 
                 deriving (Show,Read)
 
-type Answer = [(Text,Text)]
+type Answer = Map Text Text
 
 data Field = Field { ident :: Text
                    , description :: Text
@@ -34,7 +35,8 @@ data Field = Field { ident :: Text
                    }
              deriving (Show, Read)
 
--- TODO deal with line break interspersing
+-- TODO deal with line break interspersing. Although everything seems
+-- to work as is...
 encodeTrace :: Trace Answer -> Text
 encodeTrace = Lazy.pack . Char8.unpack . Base64.encode . Char8.pack . show
 
@@ -54,7 +56,6 @@ runWeb w = do
   let trace = case decodeTrace input of
                  Nothing -> emptyTrace
                  Just t -> t
-  liftIO $ print trace
   play trace
   where
     play t = do
@@ -62,10 +63,9 @@ runWeb w = do
       case r of 
         Left (q, t') -> do
           answers <- mapM (maybeParam . ident) $ fields q
-          liftIO $ print answers
           if Nothing `elem` answers
             then sendForm q t'
-            else play $ addAnswer (catMaybes answers) t 
+            else play $ addAnswer (fromList $ catMaybes answers) t 
         Right x -> return ()
 
 -- A more convenient way to get parameters, with Maybe rather than an exception
