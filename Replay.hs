@@ -20,7 +20,9 @@ data Trace r = Trace { visited :: [Item r] -- ^ events up to now, in reverse ord
                      }
     deriving (Show,Read)
 
-data Item r = Answer r | Result String
+data Item r = Answer r           -- ^ a user answer
+            | Result String      -- ^ the result of a (m a) computation, stored with 'show'
+            | Cut (Maybe String) -- ^ a cut, storing the result if it has been computed already
     deriving (Show,Read)
 
 -- | Monad instance of ReplayT m q r.
@@ -58,8 +60,8 @@ liftR input = ReplayT $ \t ->
               case todo t of
                 [] -> do a <- input
                          return (Right a, addResult (show a) t)
-                ((Answer a):_) -> fail "liftR"
-                ((Result str):_) -> return (Right $ read str, visit t)
+                (Result str:_) -> return (Right $ read str, visit t)
+                _ -> fail "mismatched trace: monad expected"
 
 -- | Extract either an answer or a question with a trace, wrapped in
 -- the underlying monad.
@@ -77,17 +79,22 @@ io = liftR
 -- empty, return the question and the used trace.
 ask          :: (Monad m) => q -> ReplayT m q r r
 ask question = ReplayT $ \t ->
-                 case todo t of
-                   [] -> return (Left question, t)
-                   ((Answer a):_) -> return (Right a, visit t)
-                   ((Result str):_) -> fail $ "ask: " ++ str
+               case todo t of
+                 [] -> return (Left question, t)
+                 (Answer a:_) -> return (Right a, visit t)
+                 _ -> fail "mismatched trace: ask expected"
 
+-- Trace r -> m ((Either q a), Trace r)
 cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
 cut ra = ReplayT $ \t ->
-           case todo t of
-             [] -> runReplayT ra t
-             ((Answer a):_) -> undefined
-             ((Result str):_) -> undefined
+         case todo t of
+           [] -> runReplayT ra (addNewCut t)
+           (Cut Nothing:_) -> do (qora, t') <- runReplayT ra (visit t)
+                                 case qora of
+                                   Left q -> return (Left q, t')
+                                   Right a -> return (Right a, registerCut (show a) t')
+           (Cut (Just str):_) -> return (Right $ read str, visit t)
+           _ -> fail "mismatched trace: cut expected"
 
 --Helper functions for manipulating traces
 
@@ -105,6 +112,14 @@ addResult str (Trace v []) =  Trace ((Result str):v) []
 -- | Add an answer to the visited elements, assuming that the todo list is empty
 addAnswer                :: r ->Trace r -> Trace r
 addAnswer r (Trace v []) =  Trace ((Answer r):v) []
+
+addNewCut             :: Trace r -> Trace r
+addNewCut (Trace v t) = Trace (Cut Nothing:v) t
+
+registerCut                               :: String -> Trace r -> Trace r
+registerCut str (Trace v t) = Trace (unstack v) t
+    where unstack (Cut Nothing:vs) = Cut (Just str):vs
+          unstack (_:vs)           = vs
 
 -- | Move the first todo element to the visited elements list
 visit             :: Trace r -> Trace r
