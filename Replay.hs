@@ -20,7 +20,8 @@ module Replay (Replay
 -- replays. 'q' is the type of question that can be asked of the user,
 -- 'a' is the return type of the underlying monad 'm' and 'r' is the
 -- type of elements recorded in traces.
-newtype ReplayT m q r a = ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
+newtype ReplayT m q r a = 
+                   ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 
 -- | A version of replay T specialized for IO computation
 type Replay q r a = ReplayT IO q r a
@@ -38,6 +39,8 @@ data Item r = Answer r           -- ^ a user answer
             | Cut (Maybe String) -- ^ a cut, storing the result if it has been computed already
     deriving (Show,Read)
 
+--------------------------------------------------------------------------------
+
 -- | Monad instance of ReplayT m q r.
 instance (Monad m) => Monad (ReplayT m q r) where
     return x = ReplayT $ \t -> return (Right x, t)
@@ -46,27 +49,6 @@ instance (Monad m) => Monad (ReplayT m q r) where
                                      (Left q) -> return (Left q, t')
                                      (Right a) -> runReplayT (k a) t'
 
-
-{- liftR doesn't satisfy the monad transformer laws: 
-
-  (1)   liftR . return <> return
-
-   Our definition of return doesn't check the trace, but liftR
-   does. Given e.g. a malformed trace, the resulting monads will
-   have different behaviors.
-
-
-  (2)   liftR (m >>= f) <> liftR m >>= (liftR . f)
-
-   Here lift occurs once  on the left, and twice on the right.
-   Using the same reasoning, on the LHS the trace is modified once, 
-   and on the RHS twice.
-
-   See the file Example.hs: 
-    λ> running oneLift
-    λ> running twoLifts
-
--}
 
 -- | Extract a result of a monadic computation and add it to the
 -- trace.  Require type a to be instances of Show and Read to be able
@@ -116,6 +98,8 @@ cut ra = ReplayT $ \t ->
            (Cut (Just str):_) -> return (Right $ read str, visit t)
            _ -> fail "mismatched trace: cut expected"
 
+
+--------------------------------------------------------------------------------
 --Helper functions for manipulating traces
 
 -- | The initial, empty trace
