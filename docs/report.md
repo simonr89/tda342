@@ -112,12 +112,11 @@ To demonstrate the behaviour, we run some examples with the function
 ## Cut
 
 In order to optimise the replay monad, we implement a cut operation.
-The trace produced by that version will contain intermdiary results
+The trace produced by that version will contain intermediary results
 only if the final result has not been computed. 
-Otherwise all intermediary results are forgotten, leading to a more 
-space-efficient trace and faster replays.
 
-We add one more constructor to the type `Item` stored in trace:
+We add a third constructor `Cut` to the type `Item` stored in
+trace. It stores the already computed result as a string.
 
 ```haskell
 data Item r = Answer r
@@ -125,16 +124,10 @@ data Item r = Answer r
             | Cut String
 ```
 
-
-The third constructor in the `Item` data type is `Cut`, 
-which stores the result if it has been computed already.
-
-If we begin a computation with a cut, we check the trace if it
+If we begin a computation with a cut, we check if the trace
 contains a `Cut` value to start with.
-If the first item in the `todo` list of the trace is a `Cut str`,
-we know that the trace has been to the end of this computation before,
-and we can return that value safely, without calling `runReplayT` to
-the rest of the trace.
+If so, we know that the trace has been to the end of this computation before,
+and we can return that value safely, without calling `runReplayT`.
 
 ```haskell
 case todo t of 
@@ -158,8 +151,9 @@ First test, run `cut` with an incomplete trace. The function
 returns a normal trace, since it didn't reach the end.
 
 ```haskell
-λ> run (cut askAge) (addAnswer "1900" emptyTrace )
-Left ("What year is it now?",Trace {visited = [Answer "1900"], todo = []})
+> run (cut askAge) (addAnswer "1900" emptyTrace )
+Left ("What year is it now?"
+     ,Trace {visited = [Answer "1900"], todo = []})
 ```
 
 Second test, run `cut` with a complete trace. (We use `runDebug` since
@@ -167,7 +161,8 @@ we want to see the trace, even though the computation is ended.) It
 returns the final value, and a trace with only that value in it.
 
 ```haskell
-λ> runDebug (cut askAge) (addAnswer "1970" $ addAnswer "1900" emptyTrace )
+> runDebug (cut askAge) (addAnswer "1970" $
+                         addAnswer "1900" emptyTrace )
 (Right 70,Trace {visited = [Cut "70"], todo = []})
 ```
 
@@ -175,13 +170,9 @@ Third test, running `cut` with a cut trace. It returns the right
 value, and doesn't change the cut trace.
 
 ```haskell
-λ> runDebug (cut askAge) (addCut "70" emptyTrace)
+> runDebug (cut askAge) (addCut "70" emptyTrace)
 (Right 70,Trace {visited = [Cut "70"], todo = []})
 ```
-
-## Testing
-
-We use both manual tests and QuickCheck.
 
 
 # Web Programming
@@ -193,17 +184,16 @@ in the trace of the Replay monad.
 
 ## A library for web forms
 
-The type of our Web monad is Replay with IO as the underlying monad;
-question type is a list of fields with a description, and
-answer type is ____
-
+The type of our `Web` monad is `ReplayT` with `IO` as the underlying monad.
+We model the web forms with the type `Question`: a list of fields and
+a description. 
 
 ```haskell
 type Web a = Replay Question Answer a
 
 data Question = Question { par :: Text 
                          , fields :: [Field]
-			 }
+                         }
 
 type Answer = Map Text Text
 
@@ -213,7 +203,13 @@ data Field = Field { ident :: Text
                    }
 ```
 
-We use the function `runWeb` to ...
+We use the function `runWeb` to excract answers, using the Scotty
+function `param` and the identifiers of the fields. 
+In case the user hasn't answered all the fields, `runWeb` sends the
+form again.
+In order to save the results for an application with many different
+web pages, we store the trace in a hidden field with the identifier
+`trace`.
 
 
 ## An interesting web program
