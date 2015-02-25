@@ -58,7 +58,7 @@ runProgram p inp t =
             case r of
               Right x      -> return x
               Left (_, t') -> case inp of
-                                []       -> error "too few inputs"
+                                []       -> return $ sum (getTraceContent t')
                                 a : inp' -> play prog (addAnswer a t') inp'
 
 -- | Checking a test case. Compares expected and actual results.
@@ -97,13 +97,42 @@ testCases = [
         return (a + b + c)
 
     }
-   , TestCase
-   { testName    = "cut_test1"
-   , testInput   = [0,0]
-   , testTrace   = emptyTrace
-   , testResult  = (0, 0)
-   , testProgram = cut (return 0)
-   }
+    , TestCase
+    { testName    = "cut_test1"
+    , testInput   = repeat 0 --works with an infinite list! ^_^
+    , testTrace   = emptyTrace
+    , testResult  = (0, 0)
+    , testProgram = cut (return 0)
+    }
+
+    , TestCase
+    { testName = "interrupted_test1"
+    , testInput = [5]
+    , testTrace = emptyTrace
+    , testResult  = (5, 2)
+    , testProgram = do   
+        liftR tick
+        reached <- ask () 
+        liftR tick
+        notReached <- ask () 
+        return (reached + notReached) 
+    }
+
+    , TestCase --like basic_test2 but with extra ask added
+    { testName    = "interrupted_test2"
+    , testInput   = [4]
+    , testTrace   = addResult "1" $
+                    addAnswer 3 $
+                    emptyTrace
+    , testResult  = (8, 1)
+    , testProgram = do
+        a <- ask () -- should be 3
+        b <- liftR (return 1)
+        c <- ask () -- should be 4
+        liftR tick
+        ask ()
+        return (a + b + c)
+    }
   ]
 
 
@@ -124,6 +153,7 @@ genTestCase =
       l <- vectorOf n arbitrary :: Gen [MonadElem]
       let -- expected number of ticks
           nTicks = length $ filter (==Tick) l
+
           -- expected result of the program
           s = sum (map (\x -> case x of Tick -> 0
                                         Return n -> n
@@ -138,8 +168,8 @@ genTestCase =
                
           testRes = (s, nTicks)    
           testNam = "test" ++ show nTicks
-          testTrace = emptyTrace
-      return $ TestCase testNam testInp testTrace testRes testProg
+          testTra = emptyTrace
+      return $ TestCase testNam testInp testTra testRes testProg
           where
             toMonad (Tick)     = liftM (const 0) (liftR tick)
             toMonad (Return n) = liftR (return n)

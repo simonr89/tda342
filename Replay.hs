@@ -11,7 +11,7 @@ module Replay (Replay
              , addResult
              , addAnswer
              , addNewCut
-             , getAnswers) where
+             , getTraceContent) where
 
 -- Types
 
@@ -139,9 +139,11 @@ visit (Trace v t) = case t of
                       [] -> Trace v t
                       (x:xs) -> Trace (x:v) xs
 
--- | Extract the answers of a Trace
-getAnswers               :: Trace r -> [r]
-getAnswers (Trace vis _) =  reverse $ foldr consAns [] vis
+-- | Extract the contents of a Trace.
+--   The function returns the values of all Answers and non-() Results.
+getTraceContent               :: (Read r) => Trace r -> [r]
+getTraceContent (Trace vis _) =  reverse $ foldr consAns [] vis
     where consAns (Answer r) rs = r:rs
-          consAns (Result _) rs = rs
+          consAns (Result r) rs | r == "()" = rs
+                                | otherwise = (read r):rs
                       
