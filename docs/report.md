@@ -14,13 +14,13 @@ newtype ReplayT m q r a =
      ReplayT {runReplayT :: Trace r -> m ((Either q a), Trace r) }
 ```
 
-## Traces
-
 The computation produces a trace that can be used as an argument 
 for future replays. 
 `q` is the type of question that can be asked of the user,
 `a` is the return type of the underlying monad `m` and 
 `r` is the type of elements recorded in traces.
+
+## Traces
 
 The trace contains two lists of elements, wrapped in type `Item`.
 When starting a replay with a non-empty string, all items are in
@@ -29,8 +29,18 @@ the `todo` list. Whenever an item is consumed, it is moved to the
 
 ```haskell
 data Trace r = Trace { visited :: [Item r]
-                     , todo :: [Item r]   
+                     , todo    :: [Item r]   
                      }
+```
+
+The datatype `Item r` has constructors for answers and results.
+`Answer r` is the answer of the type `r`, given by the user.
+`Result String` is the result of a computation in the underlying monad,
+stored as a string. The type `r` must have `Show` and `Read`
+instances, in order to be stored in the `Item r` type.
+
+```haskell
+data Item r = Answer r | Result String
 ```
 
 For handling traces, the module exports `emptyTrace`, the default
@@ -50,19 +60,19 @@ The API provides the following functions:
 ```haskell
 ask   :: q -> ReplayT m q r r
 run   :: ReplayT m q r a -> Trace r -> m (Either (q, Trace r) a)
-liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
-io    :: (Show a, Read a) => IO a -> ReplayT IO q r a
+liftR :: (Monad m, Show a, Read a) => m a  -> ReplayT m  q r a
+io    :: (         Show a, Read a) => IO a -> ReplayT IO q r a
 ```
 
 `ask` takes a value of type `q` and returns a Replay computation which
 expects an answer from the user or from the trace.
-`run` takes a Replay computation, a trace, and 
+`run` takes a Replay computation, a trace, and tries to run through
+the whole 
 
 The intended usage is that whenever a computation is stopped,
 the `run` function returns the latest question with the used trace.
 The application using the replay monad will prompt the user with the
 question, add the answer to the trace, and run the Replay monad again.
-
 
 We implement the function `liftR` to lift a computation in the underlying monad
 and add it to the trace. `io` is a specialised version, for IO as the
@@ -130,9 +140,7 @@ data Item r = Answer r
             | Cut (Maybe String)
 ```
 
-Answer r is the answer of the type r, given by the user.
-Result String is the result of a computation in the underlying monad,
-stored as a string.
+
 The third constructor in the `Item` data type is `Cut`, 
 which stores the result if it has been computed already, otherwise
 it contains `Nothing`.

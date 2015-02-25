@@ -6,12 +6,13 @@ import Data.Time
 trace =
     addResult "2015-02-05 15:05:08.780997 UTC" $
     addResult "()" $
-    addAnswer "27" $
-    addResult "()" $
     addAnswer "Simon" $
+    addResult "()" $
+    addAnswer "27" $
     addResult "()" $
     addResult "2015-02-05 15:05:08.780997 UTC" $
     emptyTrace
+
 
 example :: Replay String String Int
 example = do
@@ -49,3 +50,10 @@ running prog = play emptyTrace
         r <- getLine
         play $ addAnswer r t'
       Right x      -> return x
+
+askAge :: ReplayT IO String String Integer
+askAge = do
+     birth <- ask "What is your birth year?"
+     now <- io getCurrentTime
+     let (year, _month, _day) = toGregorian $ utctDay now
+     return (year - read birth)

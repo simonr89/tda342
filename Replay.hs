@@ -140,10 +140,13 @@ visit (Trace v t) = case t of
                       (x:xs) -> Trace (x:v) xs
 
 -- | Extract the contents of a Trace.
---   The function returns the values of all Answers and non-() Results.
+--   Returns the values of all Answers and non-() Results and Cuts.
 getTraceContent               :: (Read r) => Trace r -> [r]
 getTraceContent (Trace vis _) =  reverse $ foldr consAns [] vis
     where consAns (Answer r) rs = r:rs
-          consAns (Result r) rs | r == "()" = rs
-                                | otherwise = (read r):rs
-                      
+          consAns (Result r) rs = case r of
+                                   "()" -> rs
+                                   _    -> (read r):rs
+          consAns (Cut mv)   rs = case mv of 
+                                   (Just r) -> consAns (Result r) rs 
+                                   Nothing  -> rs

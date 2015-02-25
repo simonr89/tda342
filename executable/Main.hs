@@ -23,7 +23,7 @@ main = scotty 3000 $ do
 
 form       :: Text -> Int -> Question
 form t fid = Question { par = "Available commands are: " `append` 
-                              Text.pack (joinText commands) `append` 
+                              Text.pack (joinText cmds) `append` 
                               " (with flags)<br/><br/>" `append` t                                         , fields = [ Field "cmd" "Command?" True
                                  , Field (append "form" (Text.pack $ show fid)) "" False
                                  ]
@@ -33,9 +33,9 @@ exampleMonad      :: Text -> Int -> Web Answer
 exampleMonad t id = do ans <- ask $ form t id
                        let cmd = Data.Map.findWithDefault "" "cmd" ans
                            (str,args) = case words (Text.unpack cmd) of
-                                   []   -> ("", [])
-                                   [c]  -> (checkSanity c, [])
-                                   c:a  -> (checkSanity c, a)
+                                   []  -> ("", [])
+                                   [c] -> checkSanity (c:[])
+                                   c   -> checkSanity c
                        res <- io $ readProcess str args []
                        exampleMonad (Text.pack $ "<pre>"++res++"</pre>") (id + 1)
 
@@ -44,16 +44,16 @@ exampleMonad t id = do ans <- ask $ form t id
 --------------------------------------------------------------------------------
 
 
-commands = ["ls", "cd", "pwd", "cat", "grep"]
+cmds = ["ls", "cd", "pwd", "cat", "grep"]
 
-checkSanity :: String -> String
-checkSanity c | c `elem` commands = c
-              | c == "rm"         = error "you're a funny one"
-              | otherwise         = error "command not allowed"                    
+checkSanity :: [String] -> (String,[String])
+checkSanity (c:as) | c `elem` cmds = (c,as)
+                   | c == "rm"     = ("echo", ["you're a funny one"])
+                   | otherwise     = ("echo", ["command `" ++inp++"' not allowed"])
+  where inp = unwords (c:as)
 
 joinText    :: [String] -> String
-joinText [] = ""
-joinText ws = foldr1 (\w s -> w ++ ',':' ':s) ws
+joinText ws = foldr1 (\w s -> w++", "++s) ws
 
 trim :: String -> String
 trim = f . f

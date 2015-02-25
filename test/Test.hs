@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main where
 
 import Replay
@@ -82,7 +84,7 @@ testCases = [
         liftR tick
         return (a + b + c)
     }
-   , TestCase
+   , TestCase     --using a predefined trace
     { testName    = "basic_test2"
     , testInput   = [4]
     , testTrace   = addResult "1" $
@@ -97,14 +99,42 @@ testCases = [
         return (a + b + c)
 
     }
-    , TestCase
+    , TestCase    --cut retains the result
     { testName    = "cut_test1"
-    , testInput   = repeat 0 --works with an infinite list! ^_^
+    , testInput   = [1..5]
     , testTrace   = emptyTrace
-    , testResult  = (0, 0)
-    , testProgram = cut (return 0)
+    , testResult  = (15, 0)
+    , testProgram = cut $ 
+       do [a,b,c,d,e] <- sequence (replicate 5 (ask ()))
+          return (a + b + c + d + e)
     }
 
+    , TestCase    --cut retains the number of ticks
+    { testName    = "cut_test2"
+    , testInput   = [1,4]
+    , testTrace   = emptyTrace
+    , testResult  = (5, 3)
+    , testProgram = cut $ 
+       do liftR tick
+          a <- ask ()
+          liftR tick
+          b <- ask ()
+          liftR tick
+          return (a + b)
+    }
+    , TestCase    --cut interacting with a trace
+    { testName    = "cut_test3"
+    , testInput   = []
+    , testTrace   = addAnswer 4 $
+                    addAnswer 6 $
+                    emptyTrace
+    , testResult  = (10, 0)
+    , testProgram = cut $ 
+       do a <- ask ()
+          liftR tick
+          b <- liftR (return 6)
+          return (a + b)
+    }
     , TestCase
     { testName = "interrupted_test1"
     , testInput = [5]
@@ -139,18 +169,27 @@ testCases = [
 --------------------------------------------------------------------------------
 -- Generating arbitrary test cases
 
-data MonadElem = Tick | Return Int | Ask Int
-                 deriving (Eq)
+data ReplayElem a = Tick | Return a | Ask a
 
-instance Arbitrary MonadElem where 
+instance (Eq a) => Eq (ReplayElem a) where
+    Tick     == Tick      = True
+    Ask a    == Ask a'    = a == a'
+    Return a == Return a' = a == a'
+    _        == _         = False
+
+instance Arbitrary (ReplayElem Int) where 
     arbitrary = do
-      n <- arbitrary
+      n <- arbitrary :: Gen Int
       elements [ Tick , Return n , Ask n ]
                              
 genTestCase :: Gen TestCase
 genTestCase =
     sized $ \n -> do
-      l <- vectorOf n arbitrary :: Gen [MonadElem]
+      l <- vectorOf n arbitrary :: Gen [ReplayElem Int]
+
+      -- decide arbitrarily if the program will use use cut
+      cut' <- arbitrary :: Gen Bool
+
       let -- expected number of ticks
           nTicks = length $ filter (==Tick) l
 
@@ -163,13 +202,15 @@ genTestCase =
                                                Return n -> []
                                                Ask n -> [n]) l
           -- generate the program to be test
-          testProg = do res <- sequence (map toMonad l)
-                        return $ sum res
+          testPro = (if cut' then cut else id) $ 
+              do res <- sequence (map toMonad l)
+                 return $ sum res
                
           testRes = (s, nTicks)    
           testNam = "test" ++ show nTicks
-          testTra = emptyTrace
-      return $ TestCase testNam testInp testTra testRes testProg
+          testTra = emptyTrace --no arbitrary instance of traces
+
+      return $ TestCase testNam testInp testTra testRes testPro
           where
             toMonad (Tick)     = liftM (const 0) (liftR tick)
             toMonad (Return n) = liftR (return n)
