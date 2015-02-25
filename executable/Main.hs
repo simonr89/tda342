@@ -21,14 +21,13 @@ main = scotty 3000 $ do
 
 --------------------------------------------------------------------------------
 
-form          :: Text -> Int -> Question
-form t formid = Question { par = "Available commands are: " `append` 
-                                 Text.pack (joinText commands) `append` 
-                                 "<br/><br/>" `append` t
-                         , fields = [ Field "cmd" "Command?" True
-                                    , Field (append "form" (Text.pack $ show formid)) "" False
-                                    ]
-                         }
+form       :: Text -> Int -> Question
+form t fid = Question { par = "Available commands are: " `append` 
+                              Text.pack (joinText commands) `append` 
+                              " (with flags)<br/><br/>" `append` t                                         , fields = [ Field "cmd" "Command?" True
+                                 , Field (append "form" (Text.pack $ show fid)) "" False
+                                 ]
+                      }
 
 exampleMonad      :: Text -> Int -> Web Answer
 exampleMonad t id = do ans <- ask $ form t id
@@ -38,7 +37,7 @@ exampleMonad t id = do ans <- ask $ form t id
                                    [c]  -> (checkSanity c, [])
                                    c:a  -> (checkSanity c, a)
                        res <- io $ readProcess str args []
-                       exampleMonad (Text.pack res) (id + 1)
+                       exampleMonad (Text.pack $ "<pre>"++res++"</pre>") (id + 1)
 
 
 
@@ -52,9 +51,11 @@ checkSanity c | c `elem` commands = c
               | c == "rm"         = error "you're a funny one"
               | otherwise         = error "command not allowed"                    
 
-joinText [] =  ""
-joinText ws =  foldr1 (\w s -> w ++ ',':' ':s) ws
+joinText    :: [String] -> String
+joinText [] = ""
+joinText ws = foldr1 (\w s -> w ++ ',':' ':s) ws
 
 trim :: String -> String
 trim = f . f
    where f = reverse . dropWhile isSpace
+
