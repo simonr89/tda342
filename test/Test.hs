@@ -109,11 +109,11 @@ testCases = [
           return (a + b + c + d + e)
     }
 
-    , TestCase    --cut retains the number of ticks
+    , TestCase    --testing cut and ticks, should fail but doesn't
     { testName    = "cut_test2"
     , testInput   = [1,4]
     , testTrace   = emptyTrace
-    , testResult  = (5, 3)
+    , testResult  = (5, 150) -- !!!
     , testProgram = cut $ 
        do liftR tick
           a <- ask ()
@@ -125,8 +125,8 @@ testCases = [
     , TestCase    --cut interacting with a trace
     { testName    = "cut_test3"
     , testInput   = []
-    , testTrace   = addAnswer 4 $
-                    addAnswer 6 $
+    , testTrace   = addResult "6" $
+                    addAnswer 4 $
                     emptyTrace
     , testResult  = (10, 0)
     , testProgram = cut $ 
@@ -188,7 +188,7 @@ genTestCase =
       l <- vectorOf n arbitrary :: Gen [ReplayElem Int]
 
       -- decide arbitrarily if the program will use use cut
-      cut' <- arbitrary :: Gen Bool
+      cut' <- elements [cut, id] :: Gen (Program -> Program)
 
       let -- expected number of ticks
           nTicks = length $ filter (==Tick) l
@@ -201,10 +201,9 @@ genTestCase =
           testInp = concatMap (\x -> case x of Tick -> []
                                                Return n -> []
                                                Ask n -> [n]) l
-          -- generate the program to be test
-          testPro = (if cut' then cut else id) $ 
-              do res <- sequence (map toMonad l)
-                 return $ sum res
+          -- generate the program to be tested
+          testPro = cut' $ do res <- sequence (map toMonad l)
+                              return $ sum res
                
           testRes = (s, nTicks)    
           testNam = "test" ++ show nTicks

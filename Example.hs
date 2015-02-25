@@ -1,59 +1,49 @@
 module Example where
 
 import Replay
-import Data.Time
-
-trace =
-    addResult "2015-02-05 15:05:08.780997 UTC" $
-    addResult "()" $
-    addAnswer "Simon" $
-    addResult "()" $
-    addAnswer "27" $
-    addResult "()" $
-    addResult "2015-02-05 15:05:08.780997 UTC" $
-    emptyTrace
 
 
-example :: Replay String String Int
-example = do
-  t0 <- io getCurrentTime
-  io (putStrLn "Hello!")
-  age <- ask "What is your age?"
-  io (putStrLn ("You are " ++ age))
-  name <- ask "What is your name?"
-  io (putStrLn (name ++ " is " ++ age ++ " years old"))
-  t1 <- io getCurrentTime
-  io (putStrLn ("Total time: " ++ show (diffUTCTime t1 t0)))
-  return (read age)
+-- | Simple example program
+askAge :: ReplayT IO String String Integer
+askAge = do
+    birth <- ask "What is your birth year?"
+    now <- ask "What year is it now?"
+    return (read now - read birth)
 
-oneLift :: Replay String String Int
-oneLift = do
-  foo <- liftR $ return 3 >>= (\n -> return (n+1))
-  ask "Say something. Next line should show just one 4 in trace."
-  return foo
-
-twoLifts :: Replay String String Int
-twoLifts = do
-  foo <- liftR (return 3) >>= liftR . (\n -> return (n+1))
-  ask "Say something. Next line should show 3 and 4 in trace."
-  return foo
 
 running :: Replay String String a -> IO a
 running prog = play emptyTrace
  where
   play t = do
-    print t
     r <- run prog t    -- this is the same prog every time!
     case r of
       Left (q, t') -> do
-        print t'
         putStr ("Question: " ++ q ++ " ")
         r <- getLine
         play $ addAnswer r t'
       Right x      -> return x
 
-askSomething :: ReplayT IO String String String
-askSomething = do
-     foo <- ask "What is the meaning of life?"
-     bar <- ask "Nice answer!"
-     return (foo ++ bar)
+
+runningDebug :: Replay String String a -> IO (a, Trace String)
+runningDebug prog = play emptyTrace
+ where
+  play t = do
+    r <- runDebug prog t
+    case r of
+      (Left q, t') -> do
+        print t'
+        putStr ("Question: " ++ q ++ " ")
+        r <- getLine
+        play $ addAnswer r t'
+      (Right x, t') -> return (x, t')
+
+testCut :: (Show a, Read a) => Replay String String a -> IO ()
+testCut prog = do 
+    let cutProg = cut prog
+    (res,cutTrace) <- runningDebug $ cutProg
+    putStrLn $ "Results of the first cut: " ++ show (res,cutTrace)
+    putStrLn $ "Running again with the normal run function:"
+    newRes <- run cutProg cutTrace
+    print newRes
+
+

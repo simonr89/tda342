@@ -18,7 +18,7 @@ main = scotty 3000 $ do
     post "/" serve
   where
     serve :: ActionM ()
-    serve = runWeb $ exampleMonad "" 0
+    serve = runWeb $ coolShell "" 0
 
 --------------------------------------------------------------------------------
 
@@ -30,22 +30,22 @@ form t fid = Question { par = "Available commands are: " `append`
                                  ]
                       }
 
-exampleMonad      :: Text -> Int -> Web Answer
-exampleMonad t id = do ans <- ask $ form t id
-                       let cmd = Data.Map.findWithDefault "" "cmd" ans
-                           (str,args) = case words (Text.unpack cmd) of
-                                   []  -> ("", [])
-                                   [c] -> checkSanity (c:[])
-                                   c   -> checkSanity c
-                       res <- io $ readProcess str args []
-                       exampleMonad (Text.pack $ "<pre>"++res++"</pre>") (id + 1)
+coolShell      :: Text -> Int -> Web Answer
+coolShell t id = do ans <- ask $ form t id
+                    let cmd = Data.Map.findWithDefault "" "cmd" ans
+                        (str,args) = case words (Text.unpack cmd) of
+                                []  -> ("", [])
+                                [c] -> checkSanity (c:[])
+                                c   -> checkSanity c
+                    res <- io $ readProcess str args []
+                    coolShell (Text.pack $ "<pre>"++res++"</pre>") (id + 1)
 
 
 
 --------------------------------------------------------------------------------
 
 
-cmds = ["ls", "cd", "pwd", "cat", "grep", "wget", "echo", "xargs", "git"]
+cmds = ["ls", "cd", "pwd", "cat", "grep", "wget", "echo", "xargs", "git", "touch"]
 
 checkSanity :: [String] -> (String,[String])
 checkSanity (c:as) | c `elem` cmds      = (c,as)

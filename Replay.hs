@@ -1,17 +1,18 @@
 -- | A module for replayable computations
-module Replay --  (Replay
-             -- , ReplayT
-             -- , Trace
-             -- , ask
-             -- , io
-             -- , run
-             -- , liftR
-             -- , cut
-             -- , emptyTrace
-             -- , addResult
-             -- , addAnswer
-             -- , addNewCut
-             -- , getTraceContent)
+module Replay (Replay
+             , ReplayT
+             , Trace
+             , ask
+             , io
+             , run
+             , runDebug
+             , liftR
+             , cut
+             , emptyTrace
+             , addResult
+             , addAnswer
+             , addCut
+             , getTraceContent)
              where
 
 -- Types
@@ -35,9 +36,9 @@ data Trace r = Trace { visited :: [Item r] -- ^ events up to now, in reverse ord
     deriving (Show,Read)
 
 -- | The type of elements stored in traces
-data Item r = Answer r           -- ^ a user answer
-            | Result String      -- ^ the result of a (m a) computation, stored with 'show'
-            | Cut (Maybe String) -- ^ a cut, storing the result if it has been computed already
+data Item r = Answer r       -- ^ a user answer
+            | Result String  -- ^ the result of a (m a) computation, stored with 'show'
+            | Cut String     -- ^ a cut, storing the result if it has been computed already
     deriving (Show,Read)
 
 --------------------------------------------------------------------------------
@@ -70,6 +71,15 @@ run ra t = do (qora, t') <- runReplayT ra (resetTrace t)
                 Left q -> return $ Left (q, t')
                 Right a -> return $ Right a
 
+
+-- | Run function for debugging purposes:
+--   returns the trace also with succesful computation
+runDebug      :: (Monad m) => ReplayT m q r a -> Trace r -> m (Either q a, Trace r)
+runDebug ra t = do (qora, t') <- runReplayT ra (resetTrace t)
+                   case qora of
+                      Left q -> return $ (Left q, t')
+                      Right a -> return $ (Right a, t')
+
 -- | liftR specialised for IO actions
 io :: (Show a, Read a) => IO a -> ReplayT IO q r a
 io = liftR
@@ -88,23 +98,14 @@ ask question = ReplayT $ \t ->
 -- the final result has not been computed. Otherwise all intermediary
 -- results are forgotten, leading to a more space-efficient trace and
 -- faster replays
---cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
-cut :: (Monad m, Read r, Show r) => ReplayT m q r r -> ReplayT m q r r
+cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
 cut ra = ReplayT $ \t ->
          case todo t of
-           [] -> runReplayT ra (addNewCut t)
-           (Cut Nothing:_) -> do (qora, t') <- runReplayT ra (visit t)
-                                 case qora of
-                                   Left q -> return (Left q, t')
-                                   Right a -> return (Right a, registerCut a t')
-           (Cut (Just str):_) -> return (Right $ read str, visit t)
-
-           (Answer a:ts)      -> runReplayT ra (registerCut a $ addNewCut (t {todo=ts}))
-           -- (Answer a:_)    -> do (qora, t') <- runReplayT ra (visit t)
-           --                       case qora of
-           --                         Left q -> return (Left q, t')
-           --                         Right a -> return (Right a, registerCut a (addNewCut t'))
-           _ -> fail "mismatched trace: Cut expected"
+           (Cut s:_) -> return (Right $ read s, visit t)
+           _         -> do (qora, t') <- runReplayT ra t
+                           case qora of
+                             Right a -> return (Right a, addCut (show a) emptyTrace)
+                             Left q  -> return (Left q, t')
 
 
 --------------------------------------------------------------------------------
@@ -128,21 +129,10 @@ addResult str (Trace v []) =  Trace (Result str:v) []
 addAnswer                :: r ->Trace r -> Trace r
 addAnswer r (Trace v []) =  Trace (Answer r:v) []
 
-
--- | Add a new cut (without a saved result) to the visited elements,
--- assuming that the todo list is empty
-addNewCut             :: Trace r -> Trace r
-addNewCut (Trace v []) = Trace (Cut Nothing:v) []
-
--- | Saves a value in the last (chronological order) new cut in the
--- trace. Every visited element after that cut is removed, as they are
--- now not needed. The todo queue is left unchanged
-registerCut               :: (Show a) => a -> Trace r -> Trace r
-registerCut x (Trace v t) = Trace (unstack v) t
-    where unstack (Cut Nothing:vs) = (Cut $ Just $ show x):vs
-          unstack (_:vs)           = vs
---          unstack (v:vs)           = [v]
-          unstack ([])             = []
+-- | Add a cut to the visited elements, assuming that the todo
+-- list is empty
+addCut                :: String -> Trace r -> Trace r
+addCut str (Trace v []) =  Trace (Cut str:v) []
 
 -- | Move the first todo element to the visited elements list
 visit             :: Trace r -> Trace r
@@ -158,6 +148,4 @@ getTraceContent (Trace vis _) =  reverse $ foldr consAns [] vis
           consAns (Result r) rs = case r of
                                    "()" -> rs
                                    _    -> (read r):rs
-          consAns (Cut mv)   rs = case mv of 
-                                   (Just r) -> consAns (Result r) rs 
-                                   Nothing  -> rs
+          consAns (Cut str)  rs =  consAns (Result str) rs 
