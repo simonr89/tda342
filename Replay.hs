@@ -1,17 +1,18 @@
 -- | A module for replayable computations
-module Replay (Replay
-             , ReplayT
-             , Trace
-             , ask
-             , io
-             , run
-             , liftR
-             , cut
-             , emptyTrace
-             , addResult
-             , addAnswer
-             , addNewCut
-             , getTraceContent) where
+module Replay --  (Replay
+             -- , ReplayT
+             -- , Trace
+             -- , ask
+             -- , io
+             -- , run
+             -- , liftR
+             -- , cut
+             -- , emptyTrace
+             -- , addResult
+             -- , addAnswer
+             -- , addNewCut
+             -- , getTraceContent)
+             where
 
 -- Types
 
@@ -46,7 +47,7 @@ instance (Monad m) => Monad (ReplayT m q r) where
     return x = ReplayT $ \t -> return (Right x, t)
     m >>=  k = ReplayT $ \t -> do (qora, t') <- runReplayT m t
                                   case qora of
-                                     (Left q) -> return (Left q, t')
+                                     (Left q)  -> return (Left q, t')
                                      (Right a) -> runReplayT (k a) t'
 
 
@@ -59,7 +60,7 @@ liftR input = ReplayT $ \t ->
                 [] -> do a <- input
                          return (Right a, addResult (show a) t)
                 (Result str:_) -> return (Right $ read str, visit t)
-                _ -> fail "mismatched trace: monad expected"
+                _ -> fail "mismatched trace: Result expected"
 
 -- | Extract either an answer or a question with a trace, wrapped in
 -- the underlying monad.
@@ -75,19 +76,20 @@ io = liftR
 
 -- | Try to answer the question with the trace.  If the trace is
 -- empty, return the question and the used trace.
-ask          :: (Monad m) => q -> ReplayT m q r r
+ask          :: (Monad m, Read r) => q -> ReplayT m q r r
 ask question = ReplayT $ \t ->
                case todo t of
                  [] -> return (Left question, t)
                  (Answer a:_) -> return (Right a, visit t)
-                 _ -> fail "mismatched trace: ask expected"
+                 _ -> fail "mismatched trace: Answer expected"
 
 -- | Generate an optimized version of a replay monad. The trace
--- produced by that version will contain intermdiary results only if
+-- produced by that version will contain intermediary results only if
 -- the final result has not been computed. Otherwise all intermediary
 -- results are forgotten, leading to a more space-efficient trace and
 -- faster replays
-cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
+--cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
+cut :: (Monad m, Read r, Show r) => ReplayT m q r r -> ReplayT m q r r
 cut ra = ReplayT $ \t ->
          case todo t of
            [] -> runReplayT ra (addNewCut t)
@@ -96,7 +98,13 @@ cut ra = ReplayT $ \t ->
                                    Left q -> return (Left q, t')
                                    Right a -> return (Right a, registerCut a t')
            (Cut (Just str):_) -> return (Right $ read str, visit t)
-           _ -> fail "mismatched trace: cut expected"
+
+           (Answer a:ts)      -> runReplayT ra (registerCut a $ addNewCut (t {todo=ts}))
+           -- (Answer a:_)    -> do (qora, t') <- runReplayT ra (visit t)
+           --                       case qora of
+           --                         Left q -> return (Left q, t')
+           --                         Right a -> return (Right a, registerCut a (addNewCut t'))
+           _ -> fail "mismatched trace: Cut expected"
 
 
 --------------------------------------------------------------------------------
@@ -113,12 +121,13 @@ resetTrace (Trace v t) = Trace [] ((reverse v) ++ t)
 -- | Add a result to the visited elements, assuming that the todo list
 -- is empty
 addResult                  :: String -> Trace r -> Trace r
-addResult str (Trace v []) =  Trace ((Result str):v) []
+addResult str (Trace v []) =  Trace (Result str:v) []
 
 -- | Add an answer to the visited elements, assuming that the todo
 -- list is empty
 addAnswer                :: r ->Trace r -> Trace r
-addAnswer r (Trace v []) =  Trace ((Answer r):v) []
+addAnswer r (Trace v []) =  Trace (Answer r:v) []
+
 
 -- | Add a new cut (without a saved result) to the visited elements,
 -- assuming that the todo list is empty
@@ -132,6 +141,8 @@ registerCut               :: (Show a) => a -> Trace r -> Trace r
 registerCut x (Trace v t) = Trace (unstack v) t
     where unstack (Cut Nothing:vs) = (Cut $ Just $ show x):vs
           unstack (_:vs)           = vs
+--          unstack (v:vs)           = [v]
+          unstack ([])             = []
 
 -- | Move the first todo element to the visited elements list
 visit             :: Trace r -> Trace r

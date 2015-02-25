@@ -145,6 +145,13 @@ The third constructor in the `Item` data type is `Cut`,
 which stores the result if it has been computed already, otherwise
 it contains `Nothing`.
 
+If we begin a computation with a cut, the trace must only contain
+values that use the constructor `Cut`.
+
+> run askAge (Trace [] [Answer "1900", Answer "1970"])
+Right 70
+> run (cut askAge) (Trace [] [Cut (Just "70")])
+Right 70
 
 
 # Web Programming
@@ -166,6 +173,7 @@ type Web a = Replay Question Answer a
 
 data Question = Question { par :: Text 
                          , fields :: [Field]
+			 }
 
 type Answer = Map Text Text
 

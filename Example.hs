@@ -46,14 +46,14 @@ running prog = play emptyTrace
     r <- run prog t    -- this is the same prog every time!
     case r of
       Left (q, t') -> do
+        print t'
         putStr ("Question: " ++ q ++ " ")
         r <- getLine
         play $ addAnswer r t'
       Right x      -> return x
 
-askAge :: ReplayT IO String String Integer
-askAge = do
-     birth <- ask "What is your birth year?"
-     now <- io getCurrentTime
-     let (year, _month, _day) = toGregorian $ utctDay now
-     return (year - read birth)
+askSomething :: ReplayT IO String String String
+askSomething = do
+     foo <- ask "What is the meaning of life?"
+     bar <- ask "Nice answer!"
+     return (foo ++ bar)

@@ -3,6 +3,7 @@ module Main where
 
 import Control.Monad
 import Data.Char (isSpace)
+import Data.List (sort)
 import Data.Map (findWithDefault)
 import Data.Text.Lazy as Text (Text, pack, unpack, append, split)
 import Replay
@@ -23,7 +24,7 @@ main = scotty 3000 $ do
 
 form       :: Text -> Int -> Question
 form t fid = Question { par = "Available commands are: " `append` 
-                              Text.pack (joinText cmds) `append` 
+                              Text.pack (joinText (sort cmds)) `append` 
                               " (with flags)<br/><br/>" `append` t                                         , fields = [ Field "cmd" "Command?" True
                                  , Field (append "form" (Text.pack $ show fid)) "" False
                                  ]
@@ -44,12 +45,12 @@ exampleMonad t id = do ans <- ask $ form t id
 --------------------------------------------------------------------------------
 
 
-cmds = ["ls", "cd", "pwd", "cat", "grep"]
+cmds = ["ls", "cd", "pwd", "cat", "grep", "wget", "echo", "xargs", "git"]
 
 checkSanity :: [String] -> (String,[String])
-checkSanity (c:as) | c `elem` cmds = (c,as)
-                   | c == "rm"     = ("echo", ["you're a funny one"])
-                   | otherwise     = ("echo", ["command `" ++inp++"' not allowed"])
+checkSanity (c:as) | c `elem` cmds      = (c,as)
+                   | "rm" `elem` (c:as) = ("echo", ["you're a funny one"])
+                   | otherwise          = ("echo", ["command `" ++inp++"' not allowed"])
   where inp = unwords (c:as)
 
 joinText    :: [String] -> String
