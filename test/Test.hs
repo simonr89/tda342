@@ -57,7 +57,7 @@ runProgram p inp t =
             r <- run prog t
             case r of
               Right x      -> return x
-              Left (_, t') -> case inp of
+              Left (_, t') -> case inp of   --return what is in the trace so far
                                 []       -> return $ sum (getTraceContent t')
                                 a : inp' -> play prog (addAnswer a t') inp'
 
@@ -76,9 +76,9 @@ testCases = [
     , testResult  = (0, 2)
     , testProgram = do
         liftR tick
-        a <- ask () -- should be 0
+        a <- ask () 
         b <- liftR (return 0)
-        c <- ask () -- should be 0
+        c <- ask () 
         liftR tick
         return (a + b + c)
     }
@@ -90,9 +90,9 @@ testCases = [
                     emptyTrace
     , testResult  = (8, 1)
     , testProgram = do
-        a <- ask () -- should be 3
-        b <- liftR (return 1)
-        c <- ask () -- should be 4
+        a <- ask () -- replaced by 'Answer 3' in trace
+        b <- liftR (return 1) -- replaced by 'Result "1"' in trace
+        c <- ask () -- read from input
         liftR tick
         return (a + b + c)
 
@@ -126,9 +126,9 @@ testCases = [
                     emptyTrace
     , testResult  = (8, 1)
     , testProgram = do
-        a <- ask () -- should be 3
+        a <- ask ()
         b <- liftR (return 1)
-        c <- ask () -- should be 4
+        c <- ask ()
         liftR tick
         ask ()
         return (a + b + c)
