@@ -31,7 +31,7 @@ and hand today please
 och hand idag tack
 ```
 
-The whole GF is a big package; counting all files that end in `.hs` in the `src/` directory results in 197 files.
+The whole GF is a large package; counting all `.hs` files in the `src` directory results in 197 files.
 The runtime consists of 30 modules with 5348 lines.
 In our project, we are going to work on the random generation module.
 We are aiming to optimize the random generation process by applying memoization.
@@ -40,15 +40,55 @@ We are aiming to optimize the random generation process by applying memoization.
 ## Learning outcomes
 
 ### DSL: design embedded domain specific languages
-DSL.Concepts: (abstract) syntax, semantics, ...
-Grammatical Framework, while being an independent language instead of an EDSL,
+Grammatical Framework, while being an independent language instead of an EDSL, is a great example of a DSL.
+Each program is a *grammar*, which consists of an abstract syntax, and a set of concrete syntaxes.
+The abstract syntax defines the trees that can be formed in the grammar, and the concrete syntax(es) linearize
+those trees to strings, different ways in different languages.
+
+GF is not a Turing complete programming language. Its constructs are designed for the task of implementing multilingual grammars,
+not for general-purpose programming.
+
+#### DSL.Concepts: (abstract) syntax, semantics, ...
+
 
 DSL.Implement: implement EDSLs in Haskell (as combinator libraries)
 
 ### Types: read, understand and extend Haskell programs which use advanced type system features
-Types.Class: type classes, newtypes, deriving, ...
-Types.GADT: (generalised) algebraic datatypes & type families
-Types.HOT: functors, monads and monad transformers
+
+GF itself is a typed functional language, with higher-order functions, algebraic data types
+
+A common use case for user-defined data types is parameters: for example, 
+defining agreement as a combination of person, number and gender. Then we create the following datatypes:
+
+```haskell
+param Number = Sg | Pl ;
+param Gender = Masc | Fem | Neut ;
+param Person = P1 | P2 | P3 ;
+
+param Agreement = Agr Person Number Gender | NoAgr ;
+```
+
+In order to construct the syntax trees, the abstract syntax defines *categories* and *functions*.
+The categories can be e.g. adjective, verb, noun, or for a more domain-specific grammar, e.g. 
+person, date, currency. In each concrete syntax, those types are linearized as records.
+All concrete syntaxes will have to implement functions on those types, such as `modify :: Adjective -> NounPhrase -> NounPhrase`,
+but how the types actually are defined, is different for each language; e.g.
+In Haskell, this could be modelled in different ways; `modify` could be a polymorphic function of type
+`modify :: (Adjective a, NounPhrase b) => a -> b -> b`, and `Adjective` and `NounPhrase` could be type classes.
+
+It could be also thought as a type family `Grammar` which is parameterized by a language, and the categories would be associated types;
+e.g. 
+
+```haskell
+instance Grammar Finnish where
+  data NounPhrase = --something with number, case, ...
+
+instance Grammar French where
+  data NounPhrase = --something with number, gender, ...
+```
+
+There are no monads in the GF language, but the Haskell source code contains a lot; both common (State, Error, IO) and custom-defined.
+
 
 ### Spec: use specification based development techniques
 
