@@ -6,6 +6,8 @@ module PGF.Generate
          , generateRandomFrom,  generateRandomFromDepth
          , prove
          , mkSpace
+         , index
+         , depthG
          ) where
 
 import Data.Map as Map (keys, lookup)
@@ -189,15 +191,21 @@ data Space a where
 app :: Space (a->b) -> Space a -> Space b
 f `app` x = Map (uncurry ($)) (f :*: x)
 
+liftS2 :: (a -> b -> c) -> Space a -> Space b -> Space c
+liftS2 f sa sb = (Map $ uncurry f) (sa :*: sb)
+
+  where uncF = uncurry f   -- :: (a,b) -> c
+        sUncF = Map uncF  -- :: Space ((a,b) -> c)
+        
 --------------------------------------------------------------------------------
 
 choice    :: [Space a] -> Space a
 choice ps = foldr (:+:) Empty ps
 
-prod        :: [Space a] -> Space a
-prod []     = Empty
-prod [p]    = p
-prod (p:ps) = p :*: product ps
+-- prod        :: [Space a] -> Space a
+-- prod []     = Empty
+-- prod [p]    = p
+-- prod (p:ps) = p :*: prod ps
 
 datatype    :: [Space a] -> Space a
 datatype ps = cache (Pay (choice ps))
@@ -225,8 +233,6 @@ card (Map _ p)   = card p
 card (Pay p)     = card p
 card (Cache c _) = card' c
 
---------------------------------------------------------------------------------
-
 size :: Int -> Space a -> Space a
 size 0 (Unit x)        = Unit x
 size k (p :+: q)       = size k p :+: size k q
@@ -235,6 +241,9 @@ size k (Map f p)       = Map f (size k p)
 size k (Pay p) | k > 0 = Pay (size (k-1) p)
 size k (Cache c _)     = size' k c
 size _ _               = Empty
+
+--------------------------------------------------------------------------------
+
 
 functionsByCat :: PGF -> CId -> [CId]                 
 functionsByCat pgf cat =
@@ -253,14 +262,47 @@ mkSpace     :: PGF -> Space Expr
 mkSpace pgf =
     let abs = abstract pgf
         categories = Map.keys $ cats abs
-    in datatype $ map mkSpaceOfCat categories
+    in choice $ map mkSpaceOfCat categories
     where
       -- given the CId of a category, return the space of the functions that construct it 
-      mkSpaceOfCat cat = choice $ map mkSpaceOfConstr $ functionsByCat pgf cat
+      mkSpaceOfCat cat = datatype $ map mkSpaceOfConstr $ functionsByCat pgf cat -- :: Space Expr
       -- given the CId of a function, return its space
-      mkSpaceOfConstr cons = case functionType pgf cons of
-                               Nothing -> Empty
-                               Just (DTyp hyps _ exprs) ->
-                                   case hyps of
-                                     [] -> Unit (EFun cons)
-                                     _ -> foldr app (Unit (EApp (EFun cons))) (map (\(_,_, DTyp _ cid _) -> mkSpaceOfCat cid) hyps)
+      mkSpaceOfConstr cons = 
+        case functionType pgf cons of
+          Nothing -> Empty
+          Just (DTyp hyps _ exprs) ->
+            case hyps of
+              [] -> Unit (EFun cons) -- :: Space Expr
+              _ -> foldl
+                   (liftS2 EApp)  -- :: Space Expr -> Space Expr -> Space Expr
+                   (Unit $ EFun cons) -- Space Expr
+                   (map (\(_,_, DTyp _ cid _) -> mkSpaceOfCat cid) hyps) -- :: [Space Expr]
+
+
+
+--------------------------------------------------------------------------------
+
+index :: Space a -> Integer -> a
+index (Unit x)    0 = x
+index (p :+: q)   i
+  | i < n           = index p i
+  | otherwise       = index q (i-n)                              where n = card p
+index (p :*: q)   i = (index p (i `mod` n), index q (i `div` n)) where n = card p
+index (Map f p)   i = f (index p i)
+index (Pay p)     i = index p i
+index (Cache _ p) i = index p i
+index _ _ = error ">:("
+
+--------------------------------------------------------------------------------
+
+depthG :: Int -> Space a -> Space a
+depthG d (Unit x)        = Unit x
+depthG d (p :+: q)       = depthG d p :+: depthG d q
+depthG d (p :*: q)       = depthG d p :*: depthG d q
+depthG d (Pay p) | d > 0 = Pay (depthG (d-1) p)
+depthG d (Map f p)       = Map f (depthG d p)
+depthG d (Cache _ p)     = cache (depthG d p)
+depthG _ _               = Empty
+
+--------------------------------------------------------------------------------
+
