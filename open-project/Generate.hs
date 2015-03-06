@@ -1,11 +1,14 @@
-module PGF.Generate 
+{-# LANGUAGE GADTs #-}
+module PGF.Generate
          ( generateAll,         generateAllDepth
          , generateFrom,        generateFromDepth
          , generateRandom,      generateRandomDepth
          , generateRandomFrom,  generateRandomFromDepth
          , prove
+         , mkSpace
          ) where
 
+import Data.Map as Map (toList, lookup)
 import PGF.CId
 import PGF.Data
 --import PGF.Macros
@@ -171,3 +174,92 @@ instance RandomGen g => Selector (Identity g) where
         | d < p || null gens = (p,(e,ty),gens)
         | otherwise = let (p',e_ty',gens') = hit (d-p) gens
                       in (p',e_ty',gen:gens')
+
+-----------------------------------------------------------------------------
+
+data Space a where
+  Empty :: Space a
+  Unit  :: a -> Space a
+  (:+:) :: Space a -> Space a -> Space a
+  (:*:) :: Space a -> Space b -> Space (a,b)
+  Map   :: (a->b)  -> Space a -> Space b
+  Pay   :: Space a -> Space a
+  Cache :: Cache a -> Space a -> Space a
+
+app :: Space (a->b) -> Space a -> Space b
+f `app` x = Map (uncurry ($)) (f :*: x)
+
+--------------------------------------------------------------------------------
+
+choice :: [Space a] -> Space a
+choice ps = foldr (:+:) Empty ps
+
+datatype :: [Space a] -> Space a
+datatype ps = cache (Pay (choice ps))
+
+------------------------------------------------------------------------------
+
+data Cache a
+  = Memo Integer [Space a]
+
+card' :: Cache a -> Integer
+card' (Memo n _) = n
+
+size' :: Int -> Cache a -> Space a
+size' k (Memo _ ps) = ps !! k
+
+cache :: Space a -> Space a
+cache p = Cache (Memo (card p) [ cache (size k p) | k <- [0..] ]) p
+
+card :: Space a -> Integer
+card Empty       = 0
+card (Unit _)    = 1
+card (p :+: q)   = card p + card q
+card (p :*: q)   = card p * card q
+card (Map _ p)   = card p
+card (Pay p)     = card p
+card (Cache c _) = card' c
+
+--------------------------------------------------------------------------------
+
+size :: Int -> Space a -> Space a
+size 0 (Unit x)        = Unit x
+size k (p :+: q)       = size k p :+: size k q
+size k (p :*: q)       = choice [ size i p :*: size (k-i) q | i <- [0..k] ]
+size k (Map f p)       = Map f (size k p)
+size k (Pay p) | k > 0 = Pay (size (k-1) p)
+size k (Cache c _)     = size' k c
+size _ _               = Empty
+
+categories pgf = [c | (c,hs) <- Map.toList (cats (abstract pgf))]
+
+functionsByCat :: PGF -> CId -> [CId]                 
+functionsByCat pgf cat =
+  case Map.lookup cat (cats (abstract pgf)) of
+    Just (_,fns,_) -> map snd fns
+    Nothing        -> []
+
+functionType :: PGF -> CId -> Maybe Type
+functionType pgf fun =
+  case Map.lookup fun (funs (abstract pgf)) of
+    Just (ty,_,_,_) -> Just ty
+    Nothing         -> Nothing
+
+
+mkSpace     :: PGF -> Space Expr
+mkSpace pgf = let cats = categories pgf
+                  spaces = map (mkSpaceOfCat pgf) cats
+              in choice spaces
+
+mkSpaceOfCat         :: PGF -> CId -> Space Expr
+mkSpaceOfCat pgf cat = let constrs = functionsByCat pgf cat
+                       in datatype (map (mkSpaceOfConstr pgf) constrs)
+
+mkSpaceOfConstr          :: PGF -> CId -> Space Expr
+mkSpaceOfConstr pgf cons = case functionType pgf cons of
+                             Nothing -> Empty
+                             Just (DTyp hyps cid exprs) ->
+                                 case hyps of
+                                   [] -> Unit (EFun cons)
+                                   [(_,_, DTyp _ cid _)] -> app (Unit (EApp (EFun cons))) (mkSpaceOfCat pgf cid)
+                                                                
