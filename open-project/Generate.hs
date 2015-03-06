@@ -8,7 +8,7 @@ module PGF.Generate
          , mkSpace
          ) where
 
-import Data.Map as Map (toList, lookup)
+import Data.Map as Map (keys, lookup)
 import PGF.CId
 import PGF.Data
 --import PGF.Macros
@@ -191,10 +191,15 @@ f `app` x = Map (uncurry ($)) (f :*: x)
 
 --------------------------------------------------------------------------------
 
-choice :: [Space a] -> Space a
+choice    :: [Space a] -> Space a
 choice ps = foldr (:+:) Empty ps
 
-datatype :: [Space a] -> Space a
+prod        :: [Space a] -> Space a
+prod []     = Empty
+prod [p]    = p
+prod (p:ps) = p :*: product ps
+
+datatype    :: [Space a] -> Space a
 datatype ps = cache (Pay (choice ps))
 
 ------------------------------------------------------------------------------
@@ -231,8 +236,6 @@ size k (Pay p) | k > 0 = Pay (size (k-1) p)
 size k (Cache c _)     = size' k c
 size _ _               = Empty
 
-categories pgf = [c | (c,hs) <- Map.toList (cats (abstract pgf))]
-
 functionsByCat :: PGF -> CId -> [CId]                 
 functionsByCat pgf cat =
   case Map.lookup cat (cats (abstract pgf)) of
@@ -246,20 +249,18 @@ functionType pgf fun =
     Nothing         -> Nothing
 
 
-mkSpace     :: PGF -> Space Expr
-mkSpace pgf = let cats = categories pgf
-                  spaces = map (mkSpaceOfCat pgf) cats
-              in choice spaces
-
-mkSpaceOfCat         :: PGF -> CId -> Space Expr
-mkSpaceOfCat pgf cat = let constrs = functionsByCat pgf cat
-                       in datatype (map (mkSpaceOfConstr pgf) constrs)
-
-mkSpaceOfConstr          :: PGF -> CId -> Space Expr
-mkSpaceOfConstr pgf cons = case functionType pgf cons of
-                             Nothing -> Empty
-                             Just (DTyp hyps cid exprs) ->
-                                 case hyps of
-                                   [] -> Unit (EFun cons)
-                                   [(_,_, DTyp _ cid _)] -> app (Unit (EApp (EFun cons))) (mkSpaceOfCat pgf cid)
-                                                                
+mkSpace     :: PGF -> Space Expr              
+mkSpace pgf =
+    let abs = abstract pgf
+        categories = Map.keys $ cats abs
+    in datatype $ map mkSpaceOfCat categories
+    where
+      -- given the CId of a category, return the space of the functions that construct it 
+      mkSpaceOfCat cat = choice $ map mkSpaceOfConstr $ functionsByCat pgf cat
+      -- given the CId of a function, return its space
+      mkSpaceOfConstr cons = case functionType pgf cons of
+                               Nothing -> Empty
+                               Just (DTyp hyps _ exprs) ->
+                                   case hyps of
+                                     [] -> Unit (EFun cons)
+                                     _ -> foldr app (Unit (EApp (EFun cons))) (map (\(_,_, DTyp _ cid _) -> mkSpaceOfCat cid) hyps)
