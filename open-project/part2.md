@@ -35,22 +35,51 @@ The types `Abstr` and `Concr` are not visible in the API; however, there are a n
 -- | List of all languages available in the given grammar
 languages :: PGF -> [Language]
 
--- | List of all categories defined in the given grammar. The categories are defined in the abstract syntax with the 'cat' keyword.
+-- | List of all categories defined in the given grammar.
 categories :: PGF -> [CId]
 
 -- | List of all functions defined in the abstract syntax
 functions :: PGF -> [CId]
 ```
 
-Especially relevant are the following:
+The following are relevant for our purposes of enumerating expressions:
 
 ```haskell
 -- | List of all functions defined for a given category
-functionsByCat :: PGF -> CId -> [CId]Source
+functionsByCat :: PGF -> CId -> [CId]
 
 
 -- | The type of a given function
-functionType :: PGF -> CId -> Maybe TypeSource
+functionType :: PGF -> CId -> Maybe Type
+```
+
+Parsing and linearization have variants where more information is included, such as probability of the parse and trying with all languages.
+
+```haskell
+-- | Tries to parse the given string in the specified language and to produce abstract syntax expression.
+parse :: PGF -> Language -> Type -> String -> [Tree]
+
+
+-- | Linearizes given expression as string in the language
+linearize :: PGF -> Language -> Tree -> String
+```
+
+The function `generateAll` generates an exhaustive, possibly infinite, list of abstract syntax expressions.
+Other functions include variants such as taking a template (e.g. "Noun verb adjective noun"), or limit generation to a specified depth. 
+
+```haskell
+generateAll :: PGF -> Type -> [Expr]
+generateAllDepth :: PGF -> Type -> Maybe Int -> [Expr]
+generateFrom :: PGF -> Expr -> [Expr]
+generateFromDepth :: PGF -> Expr -> Maybe Int -> [Expr]
+generateRandom :: RandomGen g => g -> PGF -> Type -> [Expr]
+```
+
+Our contributions follow the style of the API: we've 
+
+```haskell
+ enumerateAll,         enumerateAllDepth
+         , enumerateRandom,      enumerateRandomDepth
 ```
 
 
