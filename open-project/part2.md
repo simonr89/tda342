@@ -99,8 +99,40 @@ Our contributions follow the style of the API: we've
 
 # Analysis of our code
 
-Our code is in the file `Enumerate.hs`. The whole GF source code, modified to include functions in Enumerate, is in github.com/inariksit/GF](https://github.com/inariksit/GF) and can be installed by `cabal install`.
+The Haskell library `testing-feat` enables the user to construct an
+enumeration of an algebraic datatype T as a function `Nat -> T`. The
+values produced by the enumeration are useful for testing, either
+systematic (e.g. with SmallCheck) or random (e.g. with
+QuickCheck).
 
-A large portion of the code in `Enumerate` is taken from Koen Claessen's implementation here: [github.com/koengit/feat/Feat.hs](https://github.com/koengit/feat/blob/master/Feat.hs). The whole data type `Space a` and `Cache a` is taken from there, along with the functions `app`, `datatype`, `choice`, `card`, `size`, `index` and `depth`.
-We have implemented ourselves the functions `mkSpace` and `liftS2`.
+Our contribution to GF is the module `Enumerate`, which implements
+(some of) the same functionalities as the module `Generate`, but using
+a principle based on FEAT. The whole GF source code, modified to
+include functions in Enumerate, is available on
+github.com/inariksit/GF](https://github.com/inariksit/GF) and can be
+installed using the `Makefile` provided with the source code.
 
+Our code is based on a minimal implementation of FEAT ideas written by
+Koen Claessen's and available at
+[github.com/koengit/feat/Feat.hs](https://github.com/koengit/feat/blob/master/Feat.hs). In
+contrast to the actual implementation of FEAT, this one uses a deep
+embedding to represent functional enumerations of datatypes, as well
+as explicit memoization.
+
+FEAT requires the user to represent the constructors of a datatype as
+members of the `Constructor` in order to produce a functional
+enumeration of that type. Alternatively, it is possible to use
+Template Haskell to perform compile-time introspection over that
+datatype. In our case however, the datatype (the grammar) is already
+described by a structure of the type `PGF`, which is to produce the
+enumeration. In fact having two separate deep embeddings, one for the
+grammar itself, and one for its enumeration, is a bit superfluous. As
+future work, it could be interesting to integrate the enumeration more
+tightly into the grammar representation.
+
+Compared to `Generate`, the module `Enumerate` improves the
+performance of term enumeration. However it is limited to simply typed
+terms, whereas `Generate` can produce dependently typed terms. It is
+still unclear whether the same technique could be used to geenrate
+dependently typed terms, but it is an interesting lead for future
+work.
