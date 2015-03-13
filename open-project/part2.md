@@ -124,11 +124,11 @@ Our contributions follow the style of the API: we export the following functions
 ```haskell
 -- | Enumerates an exhaustive possibly infinite list of
 -- abstract syntax expressions.
-enumerateAll        :: PGF -> Type -> [Expr]
+enumerateAll :: PGF -> Type -> [Expr]
 
 -- | A variant of 'enumerateAll' which also takes as argument
 -- the upper limit of the depth of the enumerated expression.
-enumerateAllDepth            :: PGF -> Type -> Maybe Int -> [Expr]
+enumerateAllDepth :: PGF -> Type -> Maybe Int -> [Expr]
 
 -- | Enumerates an infinite list of random abstract syntax expressions.
 -- The size of a space is also generated randomly.
@@ -136,7 +136,7 @@ enumerateRandom :: RandomGen g => g -> PGF -> Type -> [Expr]
 
 -- | A variant of 'enumerateRandom' which also takes as argument
 -- the upper limit of the depth of the enumerated expression.
-enumerateRandomDepth            :: RandomGen g => g -> PGF -> Type -> Int -> [Expr]
+enumerateRandomDepth :: RandomGen g => g -> PGF -> Type -> Int -> [Expr]
 
 -- | Enumerates a list of random abstract syntax expressions.
 -- The size of a space is given as an argument.
@@ -145,9 +145,12 @@ enumerateRandomSized :: RandomGen g => g -> Integer -> PGF -> Type -> [Expr]
 
 The function `enumerateRandomSized` that takes a size as an argument isn't in the original, but we added it, because it depends on grammar which sizes are interesting. We discuss this more in section TODO.
 
-(Move this bit to the said section:
+In addition to the aspects described above, the library includes functions for a wide range of tasks, including morphological analysis, parsing with probabilities and graphical visualization. The full documentation of the library is in [http://hackage.haskell.org/package/gf-3.6/docs/PGF.html](hackage.haskell.org/package/gf-3.6/docs/PGF.html).
 
-Size `n` includes all functions with n constructors: for the hello grammar, size 1 includes the trees `Hello` and `World`, size 2 has `Hello World`, `Hello Friends`, `Dear World` and `Dear Friends`. All bigger sizes have 4 trees; the exact same ones as size 2, but an extra `Dear` inserted for each size. 
+~~~~~ 
+Move this bit to the section TODO:
+
+Size `n` includes all functions with n constructors: for the hello grammar, size 1 includes the trees `Hello` and `World`, size 2 has `Hello World`, `Hello Friends`, `Dear World` and `Dear Friends`. All bigger sizes have 4 trees; the exact same ones as size 2, but an extra `Dear` inserted for each size.
 
 As a demonstration, we show the number of trees with different amount of constructors for the first 20 sizes. For some grammars, random generating a size would be quite likely to end up in a size that has 0 trees.
 
@@ -163,15 +166,51 @@ As a demonstration, we show the number of trees with different amount of constru
 [5,3,0,6,0,0,18,0,27,0,0,135,0,189,0,0,1134,0,1539,0]
 ```
 
+Depth is like size, but everything that is included in depth `n-1` is also included in depth `n`. 
 
-Depth is like size, but everything that is included in depth `n-1` is also included in depth `n`. )
+~~~~~~~
 
 
 # Library implementation
 
-
-
 ## Expressions
+
+We generate an enumeration of GF abstract syntax trees, represented by a type `Expr`. Below is a definition of the type:
+
+```haskell
+data Expr =
+   EAbs BindType CId Expr           -- ^ lambda abstraction
+ | EApp Expr Expr                   -- ^ application
+ | ELit Literal                     -- ^ literal
+ | EMeta  MetaId                    -- ^ meta variable
+ | EFun   CId                       -- ^ function or data constructor
+ | EVar   Int                       -- ^ variable with de Bruijn index
+ | ETyped Expr Type                 -- ^ local type signature
+ | EImplArg Expr                    -- ^ implicit argument in expression
+```
+
+Most of the definition wasn't relevant for our task. For instance, meta variables are used in an abstract syntax with dependent types, which is out of scope for our project. We don't need literals either, since we want to construct enumerations of the functions defined in the grammar.
+The constructors we did use are `EApp` and `EFun`; this is enough to represent all trees in our enumerations.
+
+To demonstrate the difference, here is a sentence parsed in the GF shell:
+
+```haskell
+Duck> p "she made her duck"
+PredVP she_Pron (V2VtoVP make_causative_V2V she_Pron duck_V)
+PredVP she_Pron (V2toVP make_V2 (PossNP she_Pron duck_N))
+PredVP she_Pron (V3toVP make_benefactive_V3 she_Pron (MassNP duck_N))
+```
+
+and here in ghci, using PGF library:
+```haskell
+λ> mapM_ print $ parse duck eng s "she made her duck"
+EApp (EApp (EFun PredVP) (EFun she_Pron)) (EApp (EApp (EApp (EFun V2VtoVP) (EFun make_causative_V2V)) (EFun she_Pron)) (EFun duck_V))
+EApp (EApp (EFun PredVP) (EFun she_Pron)) (EApp (EApp (EFun V2toVP) (EFun make_V2)) (EApp (EApp (EFun PossNP) (EFun she_Pron)) (EFun duck_N)))
+EApp (EApp (EFun PredVP) (EFun she_Pron)) (EApp (EApp (EApp (EFun V3toVP) (EFun make_benefactive_V3)) (EFun she_Pron)) (EApp (EFun MassNP) (EFun duck_N)))
+```
+
+In the original grammar, we have zero-place functions (e.g. `she_Pron :: Pron`, `duck_V :: V`), one-place functions (e.g. `MassNP :: N -> NP`), up to three-place functions (e.g. `V3toVP :: V3 -> NP -> NP -> VP`). The functions in the PGF library are curried: all are `CId`s that get applied with `EApp`, no matter what is the arity of the function in the original GF grammar.
+
 
 ## Random generation
 
