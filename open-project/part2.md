@@ -16,6 +16,51 @@ It contains functions to load and interpret grammars compiled in Portable Gramma
 
 Our contributions are thus not visible to a user who is writing GF code and using the GF shell, but rather to a user who is loading a grammar and writing a Haskell program to generate trees.
 
+# Introduction to Grammatical Framework
+
+Grammatical Framework (GF) is a domain-specific programming language designed to write multilingual grammars. Each program consists of an abstract syntax, and 0 or more concrete syntaxes. Below is an example of a "Hello world" grammar.
+
+```haskell
+abstract Hello = {
+
+flags startcat=Greeting ;
+
+cat
+  Greeting ;
+  Recipient ;
+fun
+  Hello   : Recipient -> Greeting ;
+  World   : Recipient ;
+  Friends : Recipient ;
+  Dear    : Recipient -> Recipient ;
+}
+```
+The grammar has categories `Greeting` and `Recipient`, and functions that build values of these categories. The start category is `Greeting`.
+
+In a concrete syntax, we give the categories concrete definitions as records that consist of strings, tables and parameters; everything that is needed to represent morphological and syntactical properties of the categories. In the English example below, we are doing fine with just string concatenation:
+
+```haskell
+concrete HelloEng of Hello = {
+
+lincat
+  Greeting, Recipient = {s : Str} ;
+lin
+  Hello rec = {s = "hello" ++ rec.s} ;
+  World     = {s = "world"} ;
+  Friends   = {s = "friends"} ;
+  Dear  rec = {s = "dear" ++ rec.s} ;
+}
+```
+
+In Icelandic, greeting agrees with the number of the recipient, so we need to encode this in our types: `Greeting` remains as a record with string, but `Recipient` includes a field to indicate number. The function `Hello` chooses appropriate form depending on its argument.
+
+```haskell
+concrete HelloIce of Hello = {
+...
+}
+```
+
+We use this grammar as an example in documenting the library interface.
 
 # Library interface
 
@@ -29,7 +74,7 @@ data PGF = PGF {
   }
 ```
 
-The types `Abstr` and `Concr` are not visible in the API; however, there are a number of functions that take a PGF as an argument and give relevant information. Some examples include
+The types `Abstr` and `Concr` are not visible in the API; however, there are a number of functions that take a PGF as an argument and return relevant information. For example, one can get a list of categories, functions and languages of a given grammar.
 
 ```haskell
 -- | List of all languages available in the given grammar
@@ -40,20 +85,27 @@ categories :: PGF -> [CId]
 
 -- | List of all functions defined in the abstract syntax
 functions :: PGF -> [CId]
+
 ```
 
-The following are relevant for our purposes of enumerating expressions:
+Both categories and functions are represented by a type `CId`, which is just a newtype wrapper for a ByteString. In addition to `functions`, the library provides `functionType` which takes a PGF and an identifier, and gives the type of that identifier.
+
 
 ```haskell
+-- | The type of a given function
+functionType :: PGF -> CId -> Maybe Type
+
 -- | List of all functions defined for a given category
 functionsByCat :: PGF -> CId -> [CId]
 
-
--- | The type of a given function
-functionType :: PGF -> CId -> Maybe Type
 ```
 
-Parsing and linearization have variants where more information is included, such as probability of the parse and trying with all languages.
+Applying `functions` to our Hello grammar, we get the result `[Dear,Friends,Hello,World]`. Applying `functionType` to `World` we get `DTyp [] Recipient`, and to `Hello` we get `DTyp [Recipient] Greeting`, meaning that the type that we get from applying `Hello` is a greeting, and it needs an argument of type `Recipient`.
+
+`functionsByCat` takes a category as an argument, and returns a list of all functions whose return type is that category. For `Recipient`, it returns `[Dear,Friends,World]`. `Dear` takes an argument and the rest two don't, but since all of them have `Recipient` as the return type, they are returned in the same list.
+
+
+The core functions of a grammar are parsing and linearization. The API contains also variants where more information is included, such as probability of the parse and trying with all languages.
 
 ```haskell
 -- | Tries to parse the given string in the specified language and to produce abstract syntax expression.
@@ -64,27 +116,55 @@ parse :: PGF -> Language -> Type -> String -> [Tree]
 linearize :: PGF -> Language -> Tree -> String
 ```
 
-The function `generateAll` generates an exhaustive, possibly infinite, list of abstract syntax expressions.
-Other functions include variants such as taking a template (e.g. "Noun verb adjective noun"), or limit generation to a specified depth. 
+The generation module provides both exhaustive and random generation of trees. 
+There are variants such as taking a template (e.g. only generate trees of form `noun verb adjective noun`), or limit generation to a specified depth. 
+
+Our contributions follow the style of the API: we export the following functions, which all have a counterpart in the library with prefix `generate` instead of `enumerate`.
 
 ```haskell
-generateAll :: PGF -> Type -> [Expr]
-generateAllDepth :: PGF -> Type -> Maybe Int -> [Expr]
-generateFrom :: PGF -> Expr -> [Expr]
-generateFromDepth :: PGF -> Expr -> Maybe Int -> [Expr]
-generateRandom :: RandomGen g => g -> PGF -> Type -> [Expr]
+-- | Enumerates an exhaustive possibly infinite list of
+-- abstract syntax expressions.
+enumerateAll        :: PGF -> Type -> [Expr]
+
+-- | A variant of 'enumerateAll' which also takes as argument
+-- the upper limit of the depth of the enumerated expression.
+enumerateAllDepth            :: PGF -> Type -> Maybe Int -> [Expr]
+
+-- | Enumerates an infinite list of random abstract syntax expressions.
+-- The size of a space is also generated randomly.
+enumerateRandom :: RandomGen g => g -> PGF -> Type -> [Expr]
+
+-- | A variant of 'enumerateRandom' which also takes as argument
+-- the upper limit of the depth of the enumerated expression.
+enumerateRandomDepth            :: RandomGen g => g -> PGF -> Type -> Int -> [Expr]
+
+-- | Enumerates a list of random abstract syntax expressions.
+-- The size of a space is given as an argument.
+enumerateRandomSized :: RandomGen g => g -> Integer -> PGF -> Type -> [Expr]
 ```
 
-Our contributions follow the style of the API: we've 
+The function `enumerateRandomSized` that takes a size as an argument isn't in the original, but we added it, because it depends on grammar which sizes are interesting. We discuss this more in section TODO.
+
+(Move this bit to the said section:
+
+Size `n` includes all functions with n constructors: for the hello grammar, size 1 includes the trees `Hello` and `World`, size 2 has `Hello World`, `Hello Friends`, `Dear World` and `Dear Friends`. All bigger sizes have 4 trees; the exact same ones as size 2, but an extra `Dear` inserted for each size. 
+
+As a demonstration, we show the number of trees with different amount of constructors for the first 20 sizes. For some grammars, random generating a size would be quite likely to end up in a size that has 0 trees.
 
 ```haskell
- enumerateAll,         enumerateAllDepth
-         , enumerateRandom,      enumerateRandomDepth
+λ> let helloSizes = map (\i -> size i (mkSpace' "Hello.pgf")) [1..]
+λ> let duckSizes = map (\i -> size i (mkSpace' "Duck.pgf")) [1..]
+λ> let teleSizes = map (\i -> size i (mkSpace' "Telescope.pgf")) [1..]
+λ> map card (take 20 helloSizes)
+[2,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4]
+λ> map card (take 20 duckSizes)
+[6,3,2,7,11,18,30,46,63,87,110,141,171,208,246,288,335,381,438,487]
+λ> map card (take 20 teleSizes)
+[5,3,0,6,0,0,18,0,27,0,0,135,0,189,0,0,1134,0,1539,0]
 ```
 
 
-
-
+Depth is like size, but everything that is included in depth `n-1` is also included in depth `n`. )
 
 
 # Library implementation
@@ -99,7 +179,7 @@ Our contributions follow the style of the API: we've
 
 # Analysis of our code
 
-Our code is in the file `Enumerate.hs`. The whole GF source code, modified to include functions in Enumerate, is in github.com/inariksit/GF](https://github.com/inariksit/GF) and can be installed by `cabal install`.
+Our code is in the file `Enumerate.hs`. The whole GF source code, modified to include functions in Enumerate, is in [github.com/inariksit/GF](https://github.com/inariksit/GF) and can be installed by `cabal install`.
 
 A large portion of the code in `Enumerate` is taken from Koen Claessen's implementation here: [github.com/koengit/feat/Feat.hs](https://github.com/koengit/feat/blob/master/Feat.hs). The whole data type `Space a` and `Cache a` is taken from there, along with the functions `app`, `datatype`, `choice`, `card`, `size`, `index` and `depth`.
 We have implemented ourselves the functions `mkSpace` and `liftS2`.
