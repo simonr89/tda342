@@ -1,0 +1,428 @@
+\documentclass[]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+    \usepackage{xltxtra,xunicode}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use microtype if available
+\IfFileExists{microtype.sty}{\usepackage{microtype}}{}
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{fancyhdr}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{{#1}}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{{#1}}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{{#1}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{{#1}}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{{#1}}}
+\newcommand{\RegionMarkerTok}[1]{{#1}}
+\newcommand{\ErrorTok}[1]{\textbf{{#1}}}
+\newcommand{\NormalTok}[1]{{#1}}
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={},
+            pdftitle={},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\setcounter{secnumdepth}{5}
+
+\definecolor{gray}{rgb}{0.4,0.4,0.4}
+\author{}
+\date{}
+
+\begin{document}
+
+\pagestyle{fancy}
+\lhead{\textcolor{gray}{Simon Robillard \& Inari Listenmaa}}
+\rhead{\textcolor{gray}{Advanced Functional Programming}}
+\lfoot{\textcolor{gray}{}}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0.5pt} 
+\renewcommand{\footrulewidth}{0.5pt} 
+\fancyfoot[C]{\footnotesize \textcolor{gray}{}} 
+
+\centerline{ {\Large \bf Assignment 3 -- part II} }
+\vspace*{0.2cm}
+
+As described in part I, we have worked on the Grammatical Framework
+package. However, instead of modifying the original random generation
+module, we have created our own module, using FEAT
+(\href{http://dl.acm.org/citation.cfm?id=2364515}{Duregard et al.,
+2012}).
+
+The paper, implemented in the Haskell library
+\href{http://hackage.haskell.org/package/testing-feat}{testing-feat},
+describes a technique to construct an enumeration of an algebraic
+datatype T as a function \texttt{Nat -\textgreater{} T}. The values
+produced by the enumeration are useful for testing, either systematic
+(e.g.~with SmallCheck) or random (e.g.~with QuickCheck).
+
+Our contribution to GF is the module \texttt{Enumerate}, which
+implements (some of) the same functionalities as the module
+\texttt{Generate}, but using a principle based on FEAT. The whole GF
+source code, modified to include functions in Enumerate, is available on
+\href{https://github.com/inariksit/GF}{github.com/inariksit/GF} and can
+be installed using the \texttt{Makefile} provided with the source code.
+
+We have worked on a module called
+\href{http://hackage.haskell.org/package/gf-3.6/docs/PGF.html}{PGF}: an
+API meant to be used for embedding GF grammars in Haskell programs. 
+Our contributions are thus not visible to a user who is writing GF code 
+and using the GF shell, but rather to a user who is writing a Haskell 
+program to generate and manipulate GF trees.
+
+\section{Introduction to Grammatical
+Framework}\label{introduction-to-grammatical-framework}
+
+Grammatical Framework (GF) is a domain-specific programming language
+designed to write multilingual grammars. Each program consists of an
+abstract syntax, and 0 or more concrete syntaxes. Below is an example of
+a ``Hello world'' grammar.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{abstract }\DataTypeTok{Hello} \FunctionTok{=} \NormalTok{\{}
+
+\NormalTok{flags startcat}\FunctionTok{=}\DataTypeTok{Greeting} \NormalTok{;}
+
+\NormalTok{cat}
+  \DataTypeTok{Greeting} \NormalTok{;}
+  \DataTypeTok{Recipient} \NormalTok{;}
+\NormalTok{fun}
+  \DataTypeTok{Hello}   \FunctionTok{:} \DataTypeTok{Recipient} \OtherTok{->} \DataTypeTok{Greeting} \NormalTok{;}
+  \DataTypeTok{World}   \FunctionTok{:} \DataTypeTok{Recipient} \NormalTok{;}
+  \DataTypeTok{Friends} \FunctionTok{:} \DataTypeTok{Recipient} \NormalTok{;}
+  \DataTypeTok{Dear}    \FunctionTok{:} \DataTypeTok{Recipient} \OtherTok{->} \DataTypeTok{Recipient} \NormalTok{;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+The grammar has categories \texttt{Greeting} and \texttt{Recipient}, and
+functions that build values of these categories. The start category is
+\texttt{Greeting}.
+
+In a concrete syntax, we give the categories concrete definitions as
+records that consist of strings, tables and parameters; everything that
+is needed to represent morphological and syntactical properties of the
+categories. In the English example below, we are doing fine with just
+string concatenation:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{concrete }\DataTypeTok{HelloEng} \KeywordTok{of} \DataTypeTok{Hello} \FunctionTok{=} \NormalTok{\{}
+
+\NormalTok{lincat}
+  \DataTypeTok{Greeting}\NormalTok{, }\DataTypeTok{Recipient} \FunctionTok{=} \NormalTok{\{s }\FunctionTok{:} \DataTypeTok{Str}\NormalTok{\} ;}
+\NormalTok{lin}
+  \DataTypeTok{Hello} \NormalTok{rec }\FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"hello"} \FunctionTok{++} \NormalTok{rec}\FunctionTok{.}\NormalTok{s\} ;}
+  \DataTypeTok{World}     \FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"world"}\NormalTok{\} ;}
+  \DataTypeTok{Friends}   \FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"friends"}\NormalTok{\} ;}
+  \DataTypeTok{Dear}  \NormalTok{rec }\FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"dear"} \FunctionTok{++} \NormalTok{rec}\FunctionTok{.}\NormalTok{s\} ;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+In Icelandic, greeting agrees with the number of the recipient, so we
+need to encode this in our types: \texttt{Greeting} remains as a record
+with string, but \texttt{Recipient} includes a field to indicate number.
+The function \texttt{Hello} chooses appropriate form depending on its
+argument.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{concrete }\DataTypeTok{HelloIce} \KeywordTok{of} \DataTypeTok{Hello} \FunctionTok{=} \NormalTok{\{}
+
+\NormalTok{lincat}
+  \DataTypeTok{Greeting}  \FunctionTok{=} \NormalTok{\{s }\FunctionTok{:} \DataTypeTok{Str}\NormalTok{\} ;}
+  \DataTypeTok{Recipient} \FunctionTok{=} \NormalTok{\{s }\FunctionTok{:} \DataTypeTok{Str} \NormalTok{; n }\FunctionTok{:} \DataTypeTok{Number}\NormalTok{\} ;}
+\NormalTok{lin}
+  \DataTypeTok{Hello} \NormalTok{rec }\FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \KeywordTok{case} \NormalTok{rec}\FunctionTok{.}\NormalTok{n }\KeywordTok{of} \NormalTok{\{}
+                 \DataTypeTok{Sg} \OtherTok{=>} \StringTok{"sæll"} \FunctionTok{++} \NormalTok{rec}\FunctionTok{.}\NormalTok{s ;}
+                     \DataTypeTok{Pl} \OtherTok{=>} \StringTok{"sælir"} \FunctionTok{++} \NormalTok{rec}\FunctionTok{.}\NormalTok{s \} }
+              \NormalTok{\} ;}
+  \DataTypeTok{World} \FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"heimur"} \NormalTok{; n }\FunctionTok{=} \DataTypeTok{Sg} \NormalTok{\} ;}
+  \DataTypeTok{Friends} \FunctionTok{=} \NormalTok{\{s }\FunctionTok{=} \StringTok{"vinir"} \NormalTok{; n }\FunctionTok{=} \DataTypeTok{Pl} \NormalTok{\} ;}
+\NormalTok{param}
+  \DataTypeTok{Number} \FunctionTok{=} \DataTypeTok{Sg} \FunctionTok{|} \DataTypeTok{Pl} \NormalTok{;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+We use this grammar as an example in documenting the library interface.
+
+\section{Library interface}\label{library-interface}
+
+The grammars are represented by a data type PGF, which includes the
+following information:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{data} \DataTypeTok{PGF} \FunctionTok{=} \DataTypeTok{PGF} \NormalTok{\{}
+\OtherTok{  absname   ::} \DataTypeTok{CId} \NormalTok{,}
+\OtherTok{  abstract  ::} \DataTypeTok{Abstr} \NormalTok{,}
+\OtherTok{  concretes ::} \DataTypeTok{Map.Map} \DataTypeTok{CId} \DataTypeTok{Concr}
+  \NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+The types \texttt{Abstr} and \texttt{Concr} are not visible in the API;
+however, there are a number of functions that take a PGF as an argument
+and return relevant information. For example, one can get a list of
+categories, functions and languages of a given grammar.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{-- List of all languages available in the given grammar}
+\OtherTok{languages ::} \DataTypeTok{PGF} \OtherTok{->} \NormalTok{[}\DataTypeTok{Language}\NormalTok{]}
+
+\CommentTok{-- List of all categories defined in the given grammar.}
+\OtherTok{categories ::} \DataTypeTok{PGF} \OtherTok{->} \NormalTok{[}\DataTypeTok{CId}\NormalTok{]}
+
+\CommentTok{-- List of all functions defined in the abstract syntax}
+\OtherTok{functions ::} \DataTypeTok{PGF} \OtherTok{->} \NormalTok{[}\DataTypeTok{CId}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+Both categories and functions are represented by a type \texttt{CId},
+which is just a newtype wrapper for a ByteString. In addition to
+\texttt{functions}, the library provides \texttt{functionType} which
+takes a PGF and an identifier, and gives the type of that identifier.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{-- The type of a given function}
+\OtherTok{functionType ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{CId} \OtherTok{->} \DataTypeTok{Maybe} \DataTypeTok{Type}
+
+\CommentTok{-- List of all functions defined for a given category}
+\OtherTok{functionsByCat ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{CId} \OtherTok{->} \NormalTok{[}\DataTypeTok{CId}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+Applying \texttt{functions} to our Hello grammar, we get the result
+\texttt{{[}Dear,Friends,Hello,World{]}}. Applying \texttt{functionType}
+to \texttt{World} we get \texttt{DTyp {[}{]} Recipient}, and to
+\texttt{Hello} we get \texttt{DTyp {[}Recipient{]} Greeting}, meaning
+that the type that we get from applying \texttt{Hello} is a greeting,
+and it needs an argument of type \texttt{Recipient}.
+
+\texttt{functionsByCat} takes a category as an argument, and returns a
+list of all functions whose return type is that category. For
+\texttt{Recipient}, it returns \texttt{{[}Dear,Friends,World{]}}.
+\texttt{Dear} takes an argument and the rest two don't, but since all of
+them have \texttt{Recipient} as the return type, they are returned in
+the same list.
+
+The core functions of a grammar are parsing and linearization. The API
+contains also variants where more information is included, such as
+probability of the parse.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{-- Tries to parse the given string in the specified language}
+\CommentTok{-- and to produce abstract syntax expression.}
+\OtherTok{parse ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{Language} \OtherTok{->} \DataTypeTok{Type} \OtherTok{->} \DataTypeTok{String} \OtherTok{->} \NormalTok{[}\DataTypeTok{Tree}\NormalTok{]}
+
+\CommentTok{-- Linearizes given expression as string in the language}
+\OtherTok{linearize ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{Language} \OtherTok{->} \DataTypeTok{Tree} \OtherTok{->} \DataTypeTok{String}
+\end{Highlighting}
+\end{Shaded}
+
+The generation module provides both exhaustive and random generation of
+trees. There are variants such as taking a template (e.g.~only generate
+trees of form \texttt{noun verb adjective noun}), or limit generation to
+a specified depth.
+
+Our contributions follow the style of the API: we export the functions
+\texttt{enumerate()}, which all have a counterpart \texttt{generate*}
+function in the API.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{-- Generates an exhaustive possibly infinite list of}
+\CommentTok{-- abstract syntax expressions.}
+\OtherTok{generateAll ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{Type} \OtherTok{->} \NormalTok{[}\DataTypeTok{Expr}\NormalTok{]}
+
+\CommentTok{-- A variant of 'generateAll' which also takes as argument}
+\CommentTok{-- the upper limit of the depth of the generated expression.}
+\OtherTok{generateAllDepth ::} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{Type} \OtherTok{->} \DataTypeTok{Maybe} \DataTypeTok{Int} \OtherTok{->} \NormalTok{[}\DataTypeTok{Expr}\NormalTok{]}
+
+\CommentTok{-- Generates an infinite list of random  expressions.}
+\OtherTok{generateRandom ::} \DataTypeTok{RandomGen} \NormalTok{g }\OtherTok{=>} \NormalTok{g }\OtherTok{->} \DataTypeTok{PGF} \OtherTok{->} \DataTypeTok{Type} \OtherTok{->} \NormalTok{[}\DataTypeTok{Expr}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+In addition to the aspects described above, the library includes
+functions for a wide range of tasks, including morphological analysis,
+parsing with probabilities and graphical visualization. The full
+documentation of the library is in
+\href{hackage.haskell.org/package/gf-3.6/docs/PGF.html}{http://hackage.haskell.org/package/gf-3.6/docs/PGF.html}.
+
+\section{Library implementation}\label{library-implementation}
+
+\subsection{Expressions}\label{expressions}
+
+We generate an enumeration of GF abstract syntax trees, represented by a
+type \texttt{Expr}. Below is a definition of the type:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{data} \DataTypeTok{Expr} \FunctionTok{=}
+   \DataTypeTok{EAbs} \DataTypeTok{BindType} \DataTypeTok{CId} \DataTypeTok{Expr}       \CommentTok{-- ^ lambda abstraction}
+ \FunctionTok{|} \DataTypeTok{EApp} \DataTypeTok{Expr} \DataTypeTok{Expr}               \CommentTok{-- ^ application}
+ \FunctionTok{|} \DataTypeTok{ELit} \DataTypeTok{Literal}                 \CommentTok{-- ^ literal}
+ \FunctionTok{|} \DataTypeTok{EMeta}  \DataTypeTok{MetaId}                \CommentTok{-- ^ meta variable}
+ \FunctionTok{|} \DataTypeTok{EFun}   \DataTypeTok{CId}                   \CommentTok{-- ^ function or data constructor}
+ \FunctionTok{|} \DataTypeTok{EVar}   \DataTypeTok{Int}                   \CommentTok{-- ^ variable with de Bruijn index}
+ \FunctionTok{|} \DataTypeTok{ETyped} \DataTypeTok{Expr} \DataTypeTok{Type}             \CommentTok{-- ^ local type signature}
+ \FunctionTok{|} \DataTypeTok{EImplArg} \DataTypeTok{Expr}                \CommentTok{-- ^ implicit argument in expression}
+\end{Highlighting}
+\end{Shaded}
+
+Most of the definition wasn't relevant for our task. For instance, meta
+variables are used in an abstract syntax with dependent types, which is
+out of scope for our project. We don't need literals either, since we
+want to construct enumerations of the functions defined in the grammar.
+The constructors we did use are \texttt{EApp} and \texttt{EFun}; this is
+enough to represent all trees in our enumerations.
+
+To demonstrate the difference, here is a sentence parsed in the GF
+shell:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DataTypeTok{Duck}\FunctionTok{>} \NormalTok{p }\StringTok{"she made her duck"}
+\DataTypeTok{PredVP} \NormalTok{she_Pron (}\DataTypeTok{V2VtoVP} \NormalTok{make_causative_V2V she_Pron duck_V)}
+\DataTypeTok{PredVP} \NormalTok{she_Pron (}\DataTypeTok{V2toVP} \NormalTok{make_V2 (}\DataTypeTok{PossNP} \NormalTok{she_Pron duck_N))}
+\DataTypeTok{PredVP} \NormalTok{she_Pron (}\DataTypeTok{V3toVP} \NormalTok{make_benefactive_V3 she_Pron (}\DataTypeTok{MassNP} \NormalTok{duck_N))}
+\end{Highlighting}
+\end{Shaded}
+
+and here in ghci, using PGF library:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{>} \NormalTok{parse duck eng s }\StringTok{"she made her duck"}
+\DataTypeTok{EApp} \NormalTok{(}\DataTypeTok{EApp} \NormalTok{(}\DataTypeTok{EFun} \DataTypeTok{PredVP}\NormalTok{)}
+           \NormalTok{(}\DataTypeTok{EFun} \NormalTok{she_Pron)) }
+     \NormalTok{(}\DataTypeTok{EApp} \NormalTok{(}\DataTypeTok{EApp} \NormalTok{(}\DataTypeTok{EApp} \NormalTok{(}\DataTypeTok{EFun} \DataTypeTok{V2VtoVP}\NormalTok{) }
+                       \NormalTok{(}\DataTypeTok{EFun} \NormalTok{make_causative_V2V)) }
+                 \NormalTok{(}\DataTypeTok{EFun} \NormalTok{she_Pron)) }
+           \NormalTok{(}\DataTypeTok{EFun} \NormalTok{duck_V))}
+\FunctionTok{...}
+\end{Highlighting}
+\end{Shaded}
+
+In the original grammar, we have zero-place functions (e.g.
+\texttt{she\_Pron :: Pron}, \texttt{duck\_V :: V}), one-place functions
+(e.g. \texttt{MassNP :: N -\textgreater{} NP}), up to three-place
+functions (e.g.
+\texttt{V3toVP :: V3 -\textgreater{} NP -\textgreater{} NP -\textgreater{} VP}).
+The functions in the PGF library are curried: all functions are
+\texttt{CId}s that are applied with \texttt{EApp}, no matter what is the
+arity of the function in the original GF grammar. This enables us to
+create an enumeration for each category, by enumerating all functions
+that construct said category. The piece of code below is from the
+function \texttt{mkSpaceOfCat}. We can just fold over the list of
+arguments, no matter how many they are, since \texttt{EApp} always takes
+only two arguments, unlike the functions in the original GF code.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{-- given the CId of a function, return its space}
+\KeywordTok{case} \NormalTok{functionType abs cons }\KeywordTok{of}
+  \DataTypeTok{Nothing} \OtherTok{->} \DataTypeTok{Empty}
+  \DataTypeTok{Just} \NormalTok{(}\DataTypeTok{DTyp} \NormalTok{args _ exprs) }\OtherTok{->}
+    \KeywordTok{case} \NormalTok{args }\KeywordTok{of}
+      \NormalTok{[] }\OtherTok{->} \DataTypeTok{Unit} \NormalTok{(}\DataTypeTok{EFun} \NormalTok{cons)  }\CommentTok{-- Space Expr}
+      \NormalTok{_ }\OtherTok{->} \NormalTok{foldl}
+           \NormalTok{(liftS2 }\DataTypeTok{EApp}\NormalTok{)  }\CommentTok{-- Space Expr -> Space Expr -> Space Expr}
+           \NormalTok{(}\DataTypeTok{Unit} \FunctionTok{$} \DataTypeTok{EFun} \NormalTok{cons) }\CommentTok{-- Space Expr}
+           \NormalTok{(map (\textbackslash{}(_,_,}\DataTypeTok{DTyp} \NormalTok{_ cid _) }\OtherTok{->} \NormalTok{mkSpaceOfCat abs cid) args)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Laziness}\label{laziness}
+
+If a grammar is recursive, enumerating all expressions results in an
+infinite list. For example, the Hello world grammar can always add one
+\texttt{Dear} more to the recipient. In order to match the original
+implementation, we make sure we can make a potentially infinite
+enumeration into a list and index it. Every enumeration (called
+\texttt{Space} in the code) consists of finite enumerations, one for the
+size of the terms. Size \texttt{n} includes all functions with n
+constructors: for the Hello grammar, size 1 includes the trees
+\texttt{Hello} and \texttt{World}, size 2 has \texttt{Hello World},
+\texttt{Hello Friends}, \texttt{Dear World} and \texttt{Dear Friends}.
+For flattening the enumeration into a list, we start from size 0, and
+add each successive size to the list. The same goes with indexing; we
+start searching from the lowest size, and if the desired index isn't
+found, we move to the next size.
+
+\section{Analysis of our code}\label{analysis-of-our-code}
+
+Our code is based on a minimal implementation of FEAT ideas written by
+Koen Claessen and available at
+\href{https://github.com/koengit/feat/blob/master/Feat.hs}{github.com/koengit/feat/Feat.hs}.
+In contrast to the actual implementation of FEAT, this one uses a deep
+embedding to represent functional enumerations of datatypes, as well as
+explicit memoization.
+
+FEAT requires the user to represent the constructors of a datatype as
+members of the \texttt{Constructor} in order to produce a functional
+enumeration of that type. Alternatively, it is possible to use Template
+Haskell to perform compile-time introspection over that datatype. In our
+case however, the datatype (the grammar) is already described by a
+structure of the type \texttt{PGF}, which is to produce the enumeration.
+In fact having two separate deep embeddings, one for the grammar itself,
+and one for its enumeration, is a bit superfluous. As future work, it
+could be interesting to integrate the enumeration more tightly into the
+grammar representation.
+
+Compared to \texttt{Generate}, the module \texttt{Enumerate} improves
+the performance of term enumeration. However it is limited to simply
+typed terms, whereas \texttt{Generate} can produce dependently typed
+terms. It is still unclear whether the same technique could be used to
+generate dependently typed terms, but it is an interesting lead for
+future work.
+
+\end{document}
