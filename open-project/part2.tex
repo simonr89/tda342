@@ -87,7 +87,7 @@
 As described in part I, we have worked on the Grammatical Framework
 package. However, instead of modifying the original random generation
 module, we have created our own module, using FEAT
-(\href{http://dl.acm.org/citation.cfm?id=2364515}{Duregard et al.,
+(\href{http://dl.acm.org/citation.cfm?id=2364515}{Dureg{\aa}rd et al.,
 2012}).
 
 The paper, implemented in the Haskell library
@@ -100,9 +100,10 @@ produced by the enumeration are useful for testing, either systematic
 Our contribution to GF is the module \texttt{Enumerate}, which
 implements (some of) the same functionalities as the module
 \texttt{Generate}, but using a principle based on FEAT. The whole GF
-source code, modified to include functions in Enumerate, is available on
+source code, modified to include functions in \texttt{Enumerate}, is available on
 \href{https://github.com/inariksit/GF}{github.com/inariksit/GF} and can
-be installed using the \texttt{Makefile} provided with the source code.
+be installed using the \texttt{Makefile} provided with the source code. 
+We include the module \texttt{Enumerate} in the Fire submission.
 
 We have worked on a module called
 \href{http://hackage.haskell.org/package/gf-3.6/docs/PGF.html}{PGF}: an
@@ -239,7 +240,7 @@ takes a PGF and an identifier, and gives the type of that identifier.
 \end{Shaded}
 
 Applying \texttt{functions} to our Hello grammar, we get the result
-\texttt{{[}Dear,Friends,Hello,World{]}}. Applying \texttt{functionType}
+\texttt{{[}Dear, Friends, Hello, World{]}}. Applying \texttt{functionType}
 to \texttt{World} we get \texttt{DTyp {[}{]} Recipient}, and to
 \texttt{Hello} we get \texttt{DTyp {[}Recipient{]} Greeting}, meaning
 that the type that we get from applying \texttt{Hello} is a greeting,
